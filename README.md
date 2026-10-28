@@ -43,6 +43,10 @@ to create the listing table used by published listings. Products and rental
 listings are readable by the app; order records remain private and are queried
 through the Edge Function. Listing creation is public because this app does not
 currently require users to sign in.
+Run
+[`supabase/migrations/202610280001_create_listing_images_bucket.sql`](./supabase/migrations/202610280001_create_listing_images_bucket.sql)
+as well to let the app upload listing photos that can be displayed to other
+users.
 
 Deploy the invoice and status functions. The webhook is called by Xendit, so
 deploy it without Supabase JWT verification; it verifies Xendit's callback token

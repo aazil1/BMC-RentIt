@@ -237,6 +237,13 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Edit review'), findsOneWidget);
+
+    await tester.tap(find.text('Explore').last);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Bosch Cordless Drill').first);
+    await tester.tap(find.text('Bosch Cordless Drill').first);
+    await tester.pumpAndSettle();
+    expect(find.text('The drill worked great.'), findsOneWidget);
   });
 
   testWidgets('Activity status can move through simulated rental stages', (

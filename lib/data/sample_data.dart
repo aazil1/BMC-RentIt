@@ -23,25 +23,14 @@ final List<RentalListing> sampleListings = [
     imageUrl: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=900&q=80',
     deposit: '₱4,000',
     pricePerDay: 600,
-    rating: 4.9,
+    rating: 0,
     isAvailable: true,
     rules: [
       'Pickup and return at agreed time slot.',
       'No water exposure or sand beaches.',
       'Insurance on the lens is covered by the renter.',
     ],
-    reviews: [
-      const Review(
-        reviewerName: 'Nina',
-        comment: 'Great gear and super helpful owner.',
-        rating: 5,
-      ),
-      const Review(
-        reviewerName: 'Luis',
-        comment: 'Fast handoff and the camera was in perfect condition.',
-        rating: 4.8,
-      ),
-    ],
+    reviews: const [],
   ),
   RentalListing(
     id: 'game-1',
@@ -55,20 +44,14 @@ final List<RentalListing> sampleListings = [
     imageUrl: 'https://images.unsplash.com/photo-1606144042614-b2417e99c4e3?auto=format&fit=crop&w=900&q=80',
     deposit: '₱1,500',
     pricePerDay: 280,
-    rating: 4.8,
+    rating: 0,
     isAvailable: true,
     rules: [
       'Return with full charge.',
       'Keep the Joy-Con controllers in the original pouch.',
       'No international travel with the console.',
     ],
-    reviews: [
-      const Review(
-        reviewerName: 'Kiko',
-        comment: 'Super smooth rental and lot of fun.',
-        rating: 4.8,
-      ),
-    ],
+    reviews: const [],
   ),
   RentalListing(
     id: 'tool-1',
@@ -82,20 +65,14 @@ final List<RentalListing> sampleListings = [
     imageUrl: 'https://images.unsplash.com/photo-1504148455328-c376907d081c?auto=format&fit=crop&w=900&q=80',
     deposit: '₱2,000',
     pricePerDay: 220,
-    rating: 4.7,
+    rating: 0,
     isAvailable: true,
     rules: [
       'Please keep the drill in a dry place.',
       'Battery must be returned charged.',
       'Use only with the matching drill bits supplied.',
     ],
-    reviews: [
-      const Review(
-        reviewerName: 'Joy',
-        comment: 'Solid tool and the owner gave clear instructions.',
-        rating: 4.7,
-      ),
-    ],
+    reviews: const [],
   ),
   RentalListing(
     id: 'sport-1',
@@ -109,20 +86,14 @@ final List<RentalListing> sampleListings = [
     imageUrl: 'https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?auto=format&fit=crop&w=900&q=80',
     deposit: '₱1,800',
     pricePerDay: 260,
-    rating: 4.8,
+    rating: 0,
     isAvailable: false,
     rules: [
       'Do not leave the tent in direct sunlight.',
       'Please clean before return.',
       'Check the zipper, stakes, and rainfly before leaving.',
     ],
-    reviews: [
-      const Review(
-        reviewerName: 'Mia',
-        comment: 'Very easy experience and the tent felt extra durable.',
-        rating: 4.8,
-      ),
-    ],
+    reviews: const [],
   ),
   RentalListing(
     id: 'audio-1',
@@ -136,20 +107,14 @@ final List<RentalListing> sampleListings = [
     imageUrl: 'https://images.unsplash.com/photo-1546435770-a3e426bf472b?auto=format&fit=crop&w=900&q=80',
     deposit: '₱2,400',
     pricePerDay: 340,
-    rating: 4.9,
+    rating: 0,
     isAvailable: true,
     rules: [
       'Keep out of rain or near open flames.',
       'Return with fully charged battery.',
       'No stacking or heavy pressure on speaker panels.',
     ],
-    reviews: [
-      const Review(
-        reviewerName: 'Tess',
-        comment: 'The sound quality was amazing for our event.',
-        rating: 5,
-      ),
-    ],
+    reviews: const [],
   ),
   RentalListing(
     id: 'home-1',
@@ -163,20 +128,14 @@ final List<RentalListing> sampleListings = [
     imageUrl: 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?auto=format&fit=crop&w=900&q=80',
     deposit: '₱2,500',
     pricePerDay: 180,
-    rating: 4.7,
+    rating: 0,
     isAvailable: true,
     rules: [
       'Please do not overload the mixer bowl.',
       'Return attachments in the included case.',
       'Avoid soaking the steel housing in water.',
     ],
-    reviews: [
-      const Review(
-        reviewerName: 'Rem',
-        comment: 'Very beginner-friendly and exactly as described.',
-        rating: 4.8,
-      ),
-    ],
+    reviews: const [],
   ),
   RentalListing(
     id: 'tech-2',
@@ -190,20 +149,14 @@ final List<RentalListing> sampleListings = [
     imageUrl: 'https://images.unsplash.com/photo-1473968512647-3e447244af8f?auto=format&fit=crop&w=900&q=80',
     deposit: '₱3,000',
     pricePerDay: 750,
-    rating: 4.9,
+    rating: 0,
     isAvailable: true,
     rules: [
       'Follow local drone flight regulations.',
       'Keep the drone within line of sight.',
       'Return the batteries and accessories with the kit.',
     ],
-    reviews: [
-      const Review(
-        reviewerName: 'Marco',
-        comment: 'Easy pickup and the drone was ready to use.',
-        rating: 4.9,
-      ),
-    ],
+    reviews: const [],
   ),
   RentalListing(
     id: 'game-2',
@@ -217,20 +170,14 @@ final List<RentalListing> sampleListings = [
     imageUrl: 'https://images.unsplash.com/photo-1606813907291-d86efa9b94db?auto=format&fit=crop&w=900&q=80',
     deposit: '₱2,500',
     pricePerDay: 450,
-    rating: 4.8,
+    rating: 0,
     isAvailable: true,
     rules: [
       'Keep food and drinks away from the console.',
       'Return the controller and cables with the console.',
       'Do not change account or system settings.',
     ],
-    reviews: [
-      const Review(
-        reviewerName: 'Nina',
-        comment: 'Everything was in great condition.',
-        rating: 4.8,
-      ),
-    ],
+    reviews: const [],
   ),
   RentalListing(
     id: 'tool-2',
@@ -244,20 +191,14 @@ final List<RentalListing> sampleListings = [
     imageUrl: 'https://images.unsplash.com/photo-1504148455328-c376907d081c?auto=format&fit=crop&w=900&q=80',
     deposit: '₱1,500',
     pricePerDay: 190,
-    rating: 4.7,
+    rating: 0,
     isAvailable: true,
     rules: [
       'Use the supplied battery and charger.',
       'Keep the tool dry and clean after use.',
       'Return all accessories in the carrying case.',
     ],
-    reviews: [
-      const Review(
-        reviewerName: 'Joy',
-        comment: 'Worked well for a small home project.',
-        rating: 4.7,
-      ),
-    ],
+    reviews: const [],
   ),
   RentalListing(
     id: 'sport-2',
@@ -271,20 +212,14 @@ final List<RentalListing> sampleListings = [
     imageUrl: 'https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=900&q=80',
     deposit: '₱1,200',
     pricePerDay: 300,
-    rating: 4.8,
+    rating: 0,
     isAvailable: true,
     rules: [
       'Wear the included helmet while riding.',
       'Lock the bicycle when unattended.',
       'Return it in clean condition.',
     ],
-    reviews: [
-      const Review(
-        reviewerName: 'Mia',
-        comment: 'Comfortable ride and quick handoff.',
-        rating: 4.8,
-      ),
-    ],
+    reviews: const [],
   ),
   RentalListing(
     id: 'home-2',
@@ -298,20 +233,14 @@ final List<RentalListing> sampleListings = [
     imageUrl: 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=900&q=80',
     deposit: '₱1,800',
     pricePerDay: 250,
-    rating: 4.9,
+    rating: 0,
     isAvailable: true,
     rules: [
       'Empty and rinse the portafilter after use.',
       'Do not submerge the machine in water.',
       'Return the included accessories with the machine.',
     ],
-    reviews: [
-      const Review(
-        reviewerName: 'Tess',
-        comment: 'Made lovely coffee and was simple to use.',
-        rating: 4.9,
-      ),
-    ],
+    reviews: const [],
   ),
   RentalListing(
     id: 'tech-3',
@@ -325,19 +254,13 @@ final List<RentalListing> sampleListings = [
     imageUrl: 'https://images.unsplash.com/photo-1535016120720-40c646be5580?auto=format&fit=crop&w=900&q=80',
     deposit: '₱2,000',
     pricePerDay: 400,
-    rating: 4.6,
+    rating: 0,
     isAvailable: true,
     rules: [
       'Allow the projector to cool before packing it away.',
       'Use the included case for transport.',
       'Return the remote and cables with the projector.',
     ],
-    reviews: [
-      const Review(
-        reviewerName: 'Luis',
-        comment: 'Great for a small movie night.',
-        rating: 4.6,
-      ),
-    ],
+    reviews: const [],
   ),
 ];

@@ -256,6 +256,31 @@ class _RentItHomeState extends State<RentItHome> {
     setState(() => _listings[index] = updatedListing);
   }
 
+  void _saveListingReview(String listingId, Review review) {
+    final index = _listings.indexWhere((item) => item.id == listingId);
+    if (index < 0) return;
+
+    final listing = _listings[index];
+    final reviews = [...listing.reviews];
+    final existingIndex = reviews.indexWhere(
+      (item) => item.reviewerName == review.reviewerName,
+    );
+    if (existingIndex < 0) {
+      reviews.add(review);
+    } else {
+      reviews[existingIndex] = review;
+    }
+    final averageRating =
+        reviews.fold<double>(0, (total, item) => total + item.rating) /
+        reviews.length;
+    setState(
+      () => _listings[index] = listing.copyWith(
+        reviews: List.unmodifiable(reviews),
+        rating: averageRating,
+      ),
+    );
+  }
+
   void _deleteListing(RentalListing listing) {
     setState(() {
       _listings.removeWhere((item) => item.id == listing.id);
@@ -358,7 +383,11 @@ class _RentItHomeState extends State<RentItHome> {
         onMessageOwner: _startConversation,
       ),
       ListItemScreen(ownerName: _profileName, onPublish: _publishListing),
-      ActivityScreen(listings: _listings, onMessageOwner: _startConversation),
+      ActivityScreen(
+        listings: _listings,
+        onMessageOwner: _startConversation,
+        onReviewSaved: _saveListingReview,
+      ),
       ProfileScreen(
         name: _profileName,
         email: _profileEmail,
@@ -840,7 +869,9 @@ class _ListingCardState extends State<_ListingCard> {
                     ),
                   ),
                   Text(
-                    '${widget.listing.rating} ★',
+                    widget.listing.rating > 0
+                        ? '${widget.listing.rating} ★'
+                        : 'New',
                     style: const TextStyle(
                       fontSize: 7,
                       color: Color(0xFFFFCF61),
@@ -1196,9 +1227,64 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
                     ),
                     const SizedBox(height: 18),
                     const Text(
-                      'No reviews yet.',
-                      style: TextStyle(color: Color(0xFF8B5A38)),
+                      'Reviews',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF211A16),
+                      ),
                     ),
+                    const SizedBox(height: 8),
+                    if (listing.reviews.isEmpty)
+                      const Text(
+                        'No reviews yet.',
+                        style: TextStyle(color: Color(0xFF8B5A38)),
+                      )
+                    else
+                      ...listing.reviews.map(
+                        (review) => Container(
+                          width: double.infinity,
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      review.reviewerName,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFF211A16),
+                                      ),
+                                    ),
+                                  ),
+                                  Text(
+                                    '${review.rating.toStringAsFixed(1)} ★',
+                                    style: const TextStyle(
+                                      color: Color(0xFF8B5A38),
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                review.comment,
+                                style: const TextStyle(
+                                  color: Color(0xFF4C403B),
+                                  height: 1.4,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     const SizedBox(height: 24),
                     Row(
                       children: [
@@ -2699,10 +2785,12 @@ class ActivityScreen extends StatefulWidget {
     super.key,
     required this.listings,
     required this.onMessageOwner,
+    required this.onReviewSaved,
   });
 
   final List<RentalListing> listings;
   final ValueChanged<RentalListing> onMessageOwner;
+  final void Function(String listingId, Review review) onReviewSaved;
 
   @override
   State<ActivityScreen> createState() => _ActivityScreenState();
@@ -2853,6 +2941,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
     );
     if (review == null || !mounted) return;
     setState(() => activity.review = review);
+    widget.onReviewSaved(activity.listingId, review);
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Your review has been saved.')),
     );

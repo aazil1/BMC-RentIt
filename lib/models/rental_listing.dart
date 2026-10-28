@@ -38,7 +38,12 @@ class RentalListing {
     required this.reviews,
   });
 
-  RentalListing copyWith({String? id}) {
+  RentalListing copyWith({
+    String? id,
+    String? imageUrl,
+    double? rating,
+    List<Review>? reviews,
+  }) {
     return RentalListing(
       id: id ?? this.id,
       name: name,
@@ -48,14 +53,14 @@ class RentalListing {
       location: location,
       description: description,
       condition: condition,
-      imageUrl: imageUrl,
+      imageUrl: imageUrl ?? this.imageUrl,
       imageBytes: imageBytes,
       deposit: deposit,
       pricePerDay: pricePerDay,
-      rating: rating,
+      rating: rating ?? this.rating,
       isAvailable: isAvailable,
       rules: rules,
-      reviews: reviews,
+      reviews: reviews ?? this.reviews,
     );
   }
 }
