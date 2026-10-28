@@ -1,3 +1,4 @@
+// Product browsing and checkout screen.
 import 'package:flutter/material.dart';
 
 import '../models/product_model.dart';

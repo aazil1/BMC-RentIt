@@ -1,3 +1,4 @@
+// Widget tests for the RentIt app's main user flows.
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -12,10 +13,15 @@ void main() {
 
     await tester.pumpWidget(RentItApp(listingService: _FakeListingService()));
 
+    await tester.ensureVisible(find.text('Sony Alpha a7 III Camera Kit').first);
+    await tester.tap(find.text('Sony Alpha a7 III Camera Kit').first);
+    await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('RentIt app loads and clears Explore filters', (tester) async {
+  testWidgets('Explore search filters and restores matching listings', (
+    tester,
+  ) async {
     await tester.pumpWidget(RentItApp(listingService: _FakeListingService()));
 
     expect(find.text('RentIt'), findsWidgets);
@@ -26,10 +32,9 @@ void main() {
     await tester.pump();
     expect(find.text('No rentals found'), findsOneWidget);
 
-    await tester.ensureVisible(find.text('Clear filters'));
-    await tester.tap(find.text('Clear filters'));
+    await tester.enterText(find.byType(TextField), '');
     await tester.pump();
-    expect(find.text('6 items'), findsOneWidget);
+    expect(find.text('Sony Alpha a7 III Camera Kit'), findsWidgets);
   });
 
   testWidgets('Inbox starts empty and only lists chats after a message', (
@@ -95,6 +100,8 @@ void main() {
     await tester.tap(find.text('Coleman Camping Tent'));
     await tester.pumpAndSettle();
 
+    expect(find.text('Edit listing'), findsNothing);
+    expect(find.text('Delete listing'), findsNothing);
     final bookedButton = tester.widget<FilledButton>(
       find.widgetWithText(FilledButton, 'Booked'),
     );
@@ -130,15 +137,48 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byType(TextField).at(0), 'Test rental item');
-    await tester.enterText(find.byType(TextField).at(1), 'Quezon City');
     await tester.enterText(find.byType(TextField).at(2), '450');
+    await tester.enterText(
+      find.byType(TextField).at(4),
+      'Return clean\nKeep it dry',
+    );
+    await tester.enterText(find.byType(TextField).at(5), 'Quezon City');
     await tester.ensureVisible(find.text('Publish listing'));
     await tester.tap(find.text('Publish listing'));
     await tester.pumpAndSettle();
 
     expect(listingService.createdListings, hasLength(1));
     expect(listingService.createdListings.single.name, 'Test rental item');
+    expect(listingService.createdListings.single.rules, [
+      'Return clean',
+      'Keep it dry',
+    ]);
     expect(find.text('Test rental item'), findsOneWidget);
+
+    await tester.pump(const Duration(seconds: 5));
+    await tester.tap(find.text('Test rental item'));
+    await tester.pumpAndSettle();
+    expect(find.text('Edit listing'), findsOneWidget);
+    expect(find.text('Delete listing'), findsOneWidget);
+
+    await tester.tap(find.text('Edit listing'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byType(TextFormField).first,
+      'Edited rental item',
+    );
+    await tester.tap(find.text('Save changes'));
+    await tester.pumpAndSettle();
+    expect(find.text('Edited rental item'), findsOneWidget);
+
+    await tester.tap(find.text('Edited rental item'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete listing'));
+    await tester.pumpAndSettle();
+    expect(find.text('Delete listing?'), findsOneWidget);
+    await tester.tap(find.text('Delete listing').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Edited rental item'), findsNothing);
   });
 
   testWidgets('Activity cards open a detail dialog', (tester) async {
@@ -148,16 +188,96 @@ void main() {
     await tester.tap(find.text('Sony Alpha a7 III Camera Kit'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Status: Pending approval'), findsOneWidget);
+    expect(find.text('Status: Pending'), findsOneWidget);
     expect(find.text('Requested for 3 days · ₱1,800 total'), findsNWidgets(2));
+  });
+
+  testWidgets('Activity can be searched and filtered by status', (
+    tester,
+  ) async {
+    await tester.pumpWidget(RentItApp(listingService: _FakeListingService()));
+    await tester.tap(find.text('Activity').last);
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField).last, 'Bosch');
+    await tester.pumpAndSettle();
+    expect(find.text('Bosch Cordless Drill'), findsOneWidget);
+    expect(find.text('Sony Alpha a7 III Camera Kit'), findsNothing);
+
+    await tester.enterText(find.byType(TextField).last, '');
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Completed'));
+    await tester.pumpAndSettle();
+    expect(find.text('Bosch Cordless Drill'), findsOneWidget);
+    expect(find.text('Nintendo Switch OLED'), findsNothing);
+  });
+
+  testWidgets('Activity status can move through simulated rental stages', (
+    tester,
+  ) async {
+    await tester.pumpWidget(RentItApp(listingService: _FakeListingService()));
+    await tester.tap(find.text('Activity').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Sony Alpha a7 III Camera Kit'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Confirm rental'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Sony Alpha a7 III Camera Kit'));
+    await tester.pumpAndSettle();
+    expect(find.text('Status: Confirmed'), findsOneWidget);
+    await tester.tap(find.text('Mark completed'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Sony Alpha a7 III Camera Kit'));
+    await tester.pumpAndSettle();
+    expect(find.text('Status: Completed'), findsOneWidget);
+    await tester.tap(find.text('Request a refund'));
+    await tester.pumpAndSettle();
+    expect(find.text('Refund requested'), findsNWidgets(2));
+  });
+
+  testWidgets('Activity can open a chat with the listing owner', (
+    tester,
+  ) async {
+    await tester.pumpWidget(RentItApp(listingService: _FakeListingService()));
+    await tester.tap(find.text('Activity').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(TextButton, 'Message owner').first);
+    await tester.pumpAndSettle();
+    expect(find.text('John Doe'), findsOneWidget);
+    expect(find.text('Sony Alpha a7 III Camera Kit'), findsOneWidget);
+  });
+
+  testWidgets('Activity entries can be deleted after confirmation', (
+    tester,
+  ) async {
+    await tester.pumpWidget(RentItApp(listingService: _FakeListingService()));
+    await tester.tap(find.text('Activity').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Delete activity').first);
+    await tester.pumpAndSettle();
+    expect(find.text('Delete activity?'), findsOneWidget);
+
+    await tester.tap(find.text('Delete').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Sony Alpha a7 III Camera Kit'), findsNothing);
+    expect(find.text('Nintendo Switch OLED'), findsOneWidget);
   });
 
   testWidgets('Profile information can be edited', (tester) async {
     await tester.pumpWidget(RentItApp(listingService: _FakeListingService()));
     await tester.tap(find.text('Profile').last);
     await tester.pumpAndSettle();
-    expect(find.text('Settings'), findsNothing);
-    expect(find.text('Log out'), findsNothing);
+    expect(find.text('Payments & payouts'), findsNothing);
+    await tester.ensureVisible(find.text('Log out'));
+    await tester.tap(find.text('Log out'));
+    await tester.pump();
+    expect(find.text('You have been logged out.'), findsOneWidget);
+
     await tester.tap(find.byTooltip('Edit profile'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextFormField).first, 'Alex Smith');

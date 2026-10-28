@@ -1,3 +1,4 @@
+// Product data model used by the payment demo.
 class Product {
   final int id;
   final String name;

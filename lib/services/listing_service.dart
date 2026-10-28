@@ -1,3 +1,4 @@
+// Creates and fetches rental listings through Supabase.
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/app_config.dart';

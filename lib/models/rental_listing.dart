@@ -1,3 +1,4 @@
+// Rental listing and review data models.
 import 'dart:typed_data';
 
 class RentalListing {

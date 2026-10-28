@@ -1,3 +1,4 @@
+// Main app entry point, screens, and rental-listing interactions.
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -52,6 +53,90 @@ Widget _imagePlaceholder({required double height, double? width}) {
   );
 }
 
+const _pageBackground = LinearGradient(
+  begin: Alignment.topLeft,
+  end: Alignment.bottomRight,
+  colors: [
+    Color(0xFF17120F),
+    Color(0xFF75401F),
+    Color(0xFF1D1008),
+    Color(0xFF8A470C),
+  ],
+  stops: [0, 0.38, 0.72, 1],
+);
+
+Widget _brandHeader() {
+  return Row(
+    children: [
+      Container(
+        width: 28,
+        height: 28,
+        decoration: BoxDecoration(
+          color: const Color(0xFF17120F),
+          borderRadius: BorderRadius.circular(5),
+        ),
+        child: const Icon(
+          Icons.shopping_bag_rounded,
+          color: Colors.white,
+          size: 17,
+        ),
+      ),
+      const SizedBox(width: 8),
+      const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'RentIt',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              height: 1.1,
+            ),
+          ),
+          Text(
+            'Borrow more. Buy less.',
+            style: TextStyle(
+              color: Color(0xFFE0D2C7),
+              fontSize: 7,
+              height: 1.2,
+            ),
+          ),
+        ],
+      ),
+    ],
+  );
+}
+
+Widget _pageBody(Widget child) {
+  return Container(
+    decoration: const BoxDecoration(gradient: _pageBackground),
+    child: child,
+  );
+}
+
+InputDecoration _designInputDecoration(String label) {
+  return InputDecoration(
+    labelText: label,
+    labelStyle: const TextStyle(color: Color(0xFFE0D2C7), fontSize: 9),
+    filled: true,
+    fillColor: const Color(0xFF4A382B),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(9),
+      borderSide: const BorderSide(color: Color(0xFF70543F)),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(9),
+      borderSide: const BorderSide(color: Color(0xFF70543F)),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(9),
+      borderSide: const BorderSide(color: Color(0xFFF4510B)),
+    ),
+  );
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -77,14 +162,14 @@ class RentItApp extends StatelessWidget {
       title: 'RentIt',
       theme: ThemeData(
         useMaterial3: true,
-        scaffoldBackgroundColor: const Color(0xFFF6F1EB),
+        scaffoldBackgroundColor: const Color(0xFF211A16),
         colorScheme: ColorScheme.fromSeed(
           seedColor: orange,
           primary: orange,
           secondary: const Color(0xFF542B12),
-          surface: const Color(0xFFFFFBF7),
-          onSurface: const Color(0xFF211A16),
-          brightness: Brightness.light,
+          surface: const Color(0xFF30251F),
+          onSurface: Colors.white,
+          brightness: Brightness.dark,
         ),
         appBarTheme: const AppBarTheme(
           backgroundColor: warmBrown,
@@ -93,11 +178,11 @@ class RentItApp extends StatelessWidget {
         ),
         textTheme: const TextTheme(
           headlineMedium: TextStyle(
-            color: Color(0xFF221B18),
+            color: Colors.white,
             fontWeight: FontWeight.w700,
           ),
           titleMedium: TextStyle(
-            color: Color(0xFF221B18),
+            color: Colors.white,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -163,6 +248,25 @@ class _RentItHomeState extends State<RentItHome> {
     });
   }
 
+  void _updateListing(RentalListing updatedListing) {
+    final index = _listings.indexWhere((item) => item.id == updatedListing.id);
+    if (index < 0) {
+      throw StateError('The listing is no longer available.');
+    }
+    setState(() => _listings[index] = updatedListing);
+  }
+
+  void _deleteListing(RentalListing listing) {
+    setState(() {
+      _listings.removeWhere((item) => item.id == listing.id);
+      _savedListingIds.remove(listing.id);
+    });
+  }
+
+  bool _canManageListing(RentalListing listing) =>
+      listing.ownerName == _profileName &&
+      !sampleListings.any((sample) => sample.id == listing.id);
+
   void _toggleSaved(RentalListing listing) {
     setState(() {
       if (!_savedListingIds.add(listing.id)) {
@@ -219,6 +323,9 @@ class _RentItHomeState extends State<RentItHome> {
           conversation: conversation,
           listing: listing,
           isSaved: _savedListingIds.contains(listing.id),
+          canManageListing: _canManageListing,
+          onUpdateListing: _updateListing,
+          onDeleteListing: _deleteListing,
           onToggleSaved: _toggleSaved,
           onConversationUpdated: _saveConversation,
           onMessageOwner: _startConversation,
@@ -233,6 +340,9 @@ class _RentItHomeState extends State<RentItHome> {
       ExploreScreen(
         listings: _listings,
         savedListingIds: _savedListingIds,
+        canManageListing: _canManageListing,
+        onUpdateListing: _updateListing,
+        onDeleteListing: _deleteListing,
         onToggleSaved: _toggleSaved,
         onMessageOwner: _startConversation,
       ),
@@ -240,16 +350,22 @@ class _RentItHomeState extends State<RentItHome> {
         conversations: _conversations,
         listings: _listings,
         savedListingIds: _savedListingIds,
+        canManageListing: _canManageListing,
+        onUpdateListing: _updateListing,
+        onDeleteListing: _deleteListing,
         onToggleSaved: _toggleSaved,
         onConversationUpdated: _saveConversation,
         onMessageOwner: _startConversation,
       ),
       ListItemScreen(ownerName: _profileName, onPublish: _publishListing),
-      const ActivityScreen(),
+      ActivityScreen(listings: _listings, onMessageOwner: _startConversation),
       ProfileScreen(
         name: _profileName,
         email: _profileEmail,
         location: _profileLocation,
+        canManageListing: _canManageListing,
+        onUpdateListing: _updateListing,
+        onDeleteListing: _deleteListing,
         savedListings: _listings
             .where((listing) => _savedListingIds.contains(listing.id))
             .toList(),
@@ -266,65 +382,61 @@ class _RentItHomeState extends State<RentItHome> {
 
     return Scaffold(
       body: IndexedStack(index: _currentIndex, children: screens),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF211A16).withValues(alpha: 0.12),
-              blurRadius: 12,
-              offset: const Offset(0, -2),
+      bottomNavigationBar: NavigationBarTheme(
+        data: NavigationBarThemeData(
+          height: 56,
+          backgroundColor: const Color(0xFFF4510B),
+          indicatorColor: Colors.white,
+          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+          labelTextStyle: WidgetStateProperty.resolveWith(
+            (states) => TextStyle(
+              fontSize: 8,
+              fontWeight: FontWeight.w600,
+              color: states.contains(WidgetState.selected)
+                  ? const Color(0xFF211A16)
+                  : Colors.white,
+            ),
+          ),
+          iconTheme: WidgetStateProperty.resolveWith(
+            (states) => IconThemeData(
+              size: 18,
+              color: states.contains(WidgetState.selected)
+                  ? const Color(0xFF211A16)
+                  : Colors.white,
+            ),
+          ),
+        ),
+        child: NavigationBar(
+          selectedIndex: _currentIndex,
+          onDestinationSelected: (value) =>
+              setState(() => _currentIndex = value),
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.home_outlined),
+              selectedIcon: Icon(Icons.home_rounded),
+              label: 'Explore',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.chat_bubble_outline),
+              selectedIcon: Icon(Icons.chat_bubble),
+              label: 'Inbox',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.add_circle_outline),
+              selectedIcon: Icon(Icons.add_circle),
+              label: 'List Item',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.explore_outlined),
+              selectedIcon: Icon(Icons.explore),
+              label: 'Activity',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.person_outline),
+              selectedIcon: Icon(Icons.person),
+              label: 'Profile',
             ),
           ],
-        ),
-        child: NavigationBarTheme(
-          data: NavigationBarThemeData(
-            backgroundColor: Colors.white,
-            indicatorColor: const Color(0xFFFFF0E6),
-            labelTextStyle: WidgetStateProperty.all(
-              const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-            ),
-          ),
-          child: NavigationBar(
-            selectedIndex: _currentIndex,
-            onDestinationSelected: (value) =>
-                setState(() => _currentIndex = value),
-            destinations: const [
-              NavigationDestination(
-                icon: Icon(Icons.explore_outlined),
-                selectedIcon: Icon(Icons.explore),
-                label: 'Explore',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.inbox_outlined),
-                selectedIcon: Icon(Icons.inbox),
-                label: 'Inbox',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.add_circle_outline),
-                selectedIcon: Icon(Icons.add_circle),
-                label: 'List Item',
-              ),
-              NavigationDestination(
-                icon: Badge(
-                  backgroundColor: Color(0xFFF4510B),
-                  label: Text('1'),
-                  child: Icon(Icons.receipt_long_outlined),
-                ),
-                selectedIcon: Badge(
-                  backgroundColor: Color(0xFFF4510B),
-                  label: Text('1'),
-                  child: Icon(Icons.receipt_long),
-                ),
-                label: 'Activity',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.person_outline),
-                selectedIcon: Icon(Icons.person),
-                label: 'Profile',
-              ),
-            ],
-          ),
         ),
       ),
     );
@@ -336,12 +448,18 @@ class ExploreScreen extends StatefulWidget {
     super.key,
     required this.listings,
     required this.savedListingIds,
+    required this.canManageListing,
+    required this.onUpdateListing,
+    required this.onDeleteListing,
     required this.onToggleSaved,
     required this.onMessageOwner,
   });
 
   final List<RentalListing> listings;
   final Set<String> savedListingIds;
+  final bool Function(RentalListing) canManageListing;
+  final ValueChanged<RentalListing> onUpdateListing;
+  final ValueChanged<RentalListing> onDeleteListing;
   final ValueChanged<RentalListing> onToggleSaved;
   final ValueChanged<RentalListing> onMessageOwner;
 
@@ -377,292 +495,198 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Scaffold(
-      backgroundColor: const Color(0xFF211A16),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const CircleAvatar(
-                    radius: 18,
-                    backgroundColor: Color(0xFFF4510B),
-                    child: Icon(
-                      Icons.shopping_bag_outlined,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'RentIt',
-                          style: theme.textTheme.titleLarge?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 24,
-                          ),
-                        ),
-                        const Text(
-                          'Borrow more. Buy less.',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: Color(0xFFC8BDB4),
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 22),
-              const Text(
-                'Good morning, John',
-                style: TextStyle(
-                  color: Color(0xFFC8BDB4),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                'Find your next rental',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 26,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.5,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(20),
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFFEF5C16), Color(0xFFC9470D)],
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                  ),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
-                          Text(
-                            'Make room for more',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 20,
-                            ),
-                          ),
-                          SizedBox(height: 8),
-                          Text(
-                            'Rent what you need, when you need it.',
-                            style: TextStyle(
-                              color: Color(0xFFFFEDE5),
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      width: 62,
-                      height: 62,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.16),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.shopping_bag_rounded,
-                        size: 34,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: searchController,
-                onChanged: (_) => setState(() {}),
-                decoration: InputDecoration(
-                  filled: true,
-                  fillColor: const Color(0xFF30251F),
-                  prefixIcon: const Icon(
-                    Icons.search,
-                    color: Color(0xFFC8BDB4),
-                  ),
-                  hintText: 'Search cameras, tools, games...',
-                  hintStyle: const TextStyle(color: Color(0xFFC8BDB4)),
-                  suffixIcon: searchController.text.isEmpty
-                      ? null
-                      : IconButton(
-                          tooltip: 'Clear search',
-                          onPressed: () {
-                            searchController.clear();
-                            setState(() {});
-                          },
-                          icon: const Icon(
-                            Icons.close_rounded,
-                            color: Color(0xFFC8BDB4),
-                          ),
-                        ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: const BorderSide(color: Color(0xFF45372F)),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-                style: const TextStyle(color: Colors.white),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                height: 46,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: rentalCategories.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 8),
-                  itemBuilder: (context, index) {
-                    final category = rentalCategories[index];
-                    final isSelected = selectedCategory == category;
-                    return ChoiceChip(
-                      label: Text(category),
-                      selected: isSelected,
-                      onSelected: (_) =>
-                          setState(() => selectedCategory = category),
-                      selectedColor: const Color(0xFFF4510B),
-                      backgroundColor: const Color(0xFF30251F),
-                      labelStyle: TextStyle(
-                        color: isSelected
-                            ? Colors.white
-                            : const Color(0xFFE8DED6),
-                        fontWeight: FontWeight.w700,
-                      ),
-                      side: BorderSide.none,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(24),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: 22),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  const Expanded(
-                    child: Text(
-                      'Popular near you',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                  Text(
-                    '${filteredListings.length} items',
-                    style: const TextStyle(
-                      color: Color(0xFFC8BDB4),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              if (filteredListings.isEmpty)
+      body: _pageBody(
+        SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _brandHeader(),
+                const SizedBox(height: 18),
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 36,
-                  ),
+                  padding: const EdgeInsets.fromLTRB(12, 12, 10, 12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF30251F),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: const Color(0xFF45372F)),
+                    color: const Color(0xFFE95200),
+                    borderRadius: BorderRadius.circular(14),
                   ),
-                  child: Column(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: const [
+                            Text(
+                              'THE SMARTER WAY TO RENT',
+                              style: TextStyle(
+                                color: Color(0xFFFFD3B7),
+                                fontWeight: FontWeight.w600,
+                                fontSize: 7,
+                              ),
+                            ),
+                            SizedBox(height: 8),
+                            Text(
+                              'Find your next\nfavorite thing.',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 20,
+                                height: 1.05,
+                              ),
+                            ),
+                            SizedBox(height: 8),
+                            Text(
+                              'Great finds, right around the corner.',
+                              style: TextStyle(
+                                color: Color(0xFFFFE4D4),
+                                fontSize: 9,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                       const Icon(
-                        Icons.search_off_rounded,
-                        size: 42,
-                        color: Color(0xFFC8BDB4),
+                        Icons.shopping_bag_rounded,
+                        size: 48,
+                        color: Color(0xFFF1DED1),
                       ),
-                      const SizedBox(height: 12),
-                      const Text(
-                        'No rentals found',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 17,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      const Text(
-                        'Try another search or choose a different category.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Color(0xFFC8BDB4)),
-                      ),
-                      if (searchController.text.isNotEmpty ||
-                          selectedCategory != 'All') ...[
-                        const SizedBox(height: 16),
-                        TextButton(
-                          onPressed: () {
-                            searchController.clear();
-                            setState(() => selectedCategory = 'All');
-                          },
-                          child: const Text('Clear filters'),
-                        ),
-                      ],
                     ],
                   ),
-                )
-              else
-                GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: filteredListings.length,
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    childAspectRatio: 0.44,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 8,
-                  ),
-                  itemBuilder: (context, index) {
-                    final listing = filteredListings[index];
-                    return _ListingCard(
-                      listing: listing,
-                      isSaved: widget.savedListingIds.contains(listing.id),
-                      onToggleSaved: widget.onToggleSaved,
-                      onMessageOwner: widget.onMessageOwner,
-                    );
-                  },
                 ),
-            ],
+                const SizedBox(height: 12),
+                TextField(
+                  controller: searchController,
+                  onChanged: (_) => setState(() {}),
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: const Color(0xFF51473F),
+                    prefixIcon: const Icon(Icons.search, color: Colors.white),
+                    hintText: 'Search cameras, tools, games...',
+                    hintStyle: const TextStyle(
+                      color: Color(0xFFD4CCC6),
+                      fontSize: 10,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFF75685F)),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                  ),
+                  style: const TextStyle(color: Colors.white, fontSize: 11),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  height: 30,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: rentalCategories.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 8),
+                    itemBuilder: (context, index) {
+                      final category = rentalCategories[index];
+                      final isSelected = selectedCategory == category;
+                      return ChoiceChip(
+                        label: Text(category),
+                        selected: isSelected,
+                        onSelected: (_) =>
+                            setState(() => selectedCategory = category),
+                        selectedColor: const Color(0xFFF4510B),
+                        backgroundColor: const Color(0xFFF5F1EB),
+                        labelStyle: TextStyle(
+                          color: isSelected
+                              ? Colors.white
+                              : const Color(0xFF2D2926),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 9,
+                        ),
+                        side: BorderSide.none,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        visualDensity: VisualDensity.compact,
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 12),
+                if (filteredListings.isEmpty)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 36,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF30251F),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: const Color(0xFF45372F)),
+                    ),
+                    child: Column(
+                      children: [
+                        const Icon(
+                          Icons.search_off_rounded,
+                          size: 42,
+                          color: Color(0xFFC8BDB4),
+                        ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'No rentals found',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 17,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'Try another search or choose a different category.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Color(0xFFC8BDB4)),
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final cardWidth = (constraints.maxWidth - 8) / 2;
+                      final imageHeight = cardWidth * 0.48;
+                      return GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: filteredListings.length,
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          mainAxisExtent: imageHeight + 50,
+                          crossAxisSpacing: 8,
+                          mainAxisSpacing: 10,
+                        ),
+                        itemBuilder: (context, index) {
+                          final listing = filteredListings[index];
+                          return _ListingCard(
+                            listing: listing,
+                            imageHeight: imageHeight,
+                            isSaved: widget.savedListingIds.contains(
+                              listing.id,
+                            ),
+                            canManage: widget.canManageListing(listing),
+                            onUpdateListing: widget.onUpdateListing,
+                            onDeleteListing: widget.onDeleteListing,
+                            onToggleSaved: widget.onToggleSaved,
+                            onMessageOwner: widget.onMessageOwner,
+                          );
+                        },
+                      );
+                    },
+                  ),
+              ],
+            ),
           ),
         ),
       ),
@@ -673,13 +697,21 @@ class _ExploreScreenState extends State<ExploreScreen> {
 class _ListingCard extends StatefulWidget {
   const _ListingCard({
     required this.listing,
+    required this.imageHeight,
     required this.isSaved,
+    required this.canManage,
+    required this.onUpdateListing,
+    required this.onDeleteListing,
     required this.onToggleSaved,
     required this.onMessageOwner,
   });
 
   final RentalListing listing;
+  final double imageHeight;
   final bool isSaved;
+  final bool canManage;
+  final ValueChanged<RentalListing> onUpdateListing;
+  final ValueChanged<RentalListing> onDeleteListing;
   final ValueChanged<RentalListing> onToggleSaved;
   final ValueChanged<RentalListing> onMessageOwner;
 
@@ -696,6 +728,9 @@ class _ListingCardState extends State<_ListingCard> {
           builder: (_) => ListingDetailScreen(
             listing: widget.listing,
             isSaved: widget.isSaved,
+            canManage: widget.canManage,
+            onUpdateListing: widget.onUpdateListing,
+            onDeleteListing: widget.onDeleteListing,
             onToggleSaved: widget.onToggleSaved,
             onMessageOwner: widget.onMessageOwner,
           ),
@@ -704,15 +739,9 @@ class _ListingCardState extends State<_ListingCard> {
       borderRadius: BorderRadius.circular(18),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 5),
-            ),
-          ],
+          color: const Color(0xFF66513F),
+          borderRadius: BorderRadius.circular(13),
+          border: Border.all(color: const Color(0xFF9A7456)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -721,11 +750,11 @@ class _ListingCardState extends State<_ListingCard> {
               children: [
                 ClipRRect(
                   borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(18),
+                    top: Radius.circular(13),
                   ),
                   child: _listingImage(
                     widget.listing,
-                    height: 132,
+                    height: widget.imageHeight,
                     width: double.infinity,
                   ),
                 ),
@@ -734,19 +763,19 @@ class _ListingCardState extends State<_ListingCard> {
                   left: 10,
                   child: Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 5,
+                      horizontal: 6,
+                      vertical: 3,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF211A16).withValues(alpha: 0.5),
+                      color: Colors.white,
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
                       widget.listing.category,
                       style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF211A16),
+                        fontSize: 7,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
@@ -755,7 +784,7 @@ class _ListingCardState extends State<_ListingCard> {
                   right: 10,
                   top: 10,
                   child: Material(
-                    color: Colors.white.withValues(alpha: 0.92),
+                    color: Colors.white,
                     shape: const CircleBorder(),
                     child: IconButton(
                       tooltip: widget.isSaved
@@ -763,8 +792,8 @@ class _ListingCardState extends State<_ListingCard> {
                           : 'Save item',
                       visualDensity: VisualDensity.compact,
                       constraints: const BoxConstraints.tightFor(
-                        width: 34,
-                        height: 34,
+                        width: 22,
+                        height: 22,
                       ),
                       padding: EdgeInsets.zero,
                       onPressed: () => widget.onToggleSaved(widget.listing),
@@ -772,10 +801,8 @@ class _ListingCardState extends State<_ListingCard> {
                         widget.isSaved
                             ? Icons.favorite
                             : Icons.favorite_border_rounded,
-                        color: widget.isSaved
-                            ? const Color(0xFFF4510B)
-                            : const Color(0xFF211A16),
-                        size: 18,
+                        color: const Color(0xFF211A16),
+                        size: 13,
                       ),
                     ),
                   ),
@@ -783,57 +810,41 @@ class _ListingCardState extends State<_ListingCard> {
               ],
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+              padding: const EdgeInsets.fromLTRB(7, 5, 7, 0),
               child: Text(
                 widget.listing.name,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF211A16),
+                  fontSize: 8,
+                  height: 1.05,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
                 ),
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-              child: Text(
-                '₱${widget.listing.pricePerDay}/day',
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFFF4510B),
-                ),
-              ),
-            ),
-            const Spacer(),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+              padding: const EdgeInsets.fromLTRB(7, 6, 7, 6),
               child: Row(
                 children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: widget.listing.isAvailable
-                          ? const Color(0xFF6E8B75)
-                          : const Color(0xFFD9534F),
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      widget.listing.isAvailable ? 'Available now' : 'Booked',
+                      '₱${widget.listing.pricePerDay}/day',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 11,
+                      style: const TextStyle(
+                        fontSize: 8,
                         fontWeight: FontWeight.w700,
-                        color: widget.listing.isAvailable
-                            ? const Color(0xFF6E8B75)
-                            : const Color(0xFFD9534F),
+                        color: Colors.white,
                       ),
+                    ),
+                  ),
+                  Text(
+                    '${widget.listing.rating} ★',
+                    style: const TextStyle(
+                      fontSize: 7,
+                      color: Color(0xFFFFCF61),
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ],
@@ -851,12 +862,18 @@ class ListingDetailScreen extends StatefulWidget {
     super.key,
     required this.listing,
     required this.isSaved,
+    this.canManage = false,
+    this.onUpdateListing,
+    this.onDeleteListing,
     required this.onToggleSaved,
     required this.onMessageOwner,
   });
 
   final RentalListing listing;
   final bool isSaved;
+  final bool canManage;
+  final ValueChanged<RentalListing>? onUpdateListing;
+  final ValueChanged<RentalListing>? onDeleteListing;
   final ValueChanged<RentalListing> onToggleSaved;
   final ValueChanged<RentalListing> onMessageOwner;
 
@@ -870,6 +887,42 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
   RentalListing get listing => widget.listing;
   ValueChanged<RentalListing> get onToggleSaved => widget.onToggleSaved;
   ValueChanged<RentalListing> get onMessageOwner => widget.onMessageOwner;
+
+  Future<void> _editListing() async {
+    final updatedListing = await showDialog<RentalListing>(
+      context: context,
+      builder: (_) => _EditListingDialog(listing: listing),
+    );
+    if (updatedListing == null || !mounted) return;
+    widget.onUpdateListing?.call(updatedListing);
+    Navigator.of(context).pop();
+  }
+
+  Future<void> _deleteListing() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete listing?'),
+        content: Text('“${listing.name}” will be removed from your listings.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFB3261E),
+            ),
+            child: const Text('Delete listing'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    widget.onDeleteListing?.call(listing);
+    Navigator.of(context).pop();
+  }
 
   @override
   void initState() {
@@ -961,47 +1014,57 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
                         borderRadius: BorderRadius.circular(18),
                       ),
                       child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Rental price',
-                                style: TextStyle(
-                                  color: Color(0xFF8B5A38),
-                                  fontSize: 12,
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Rental price',
+                                  style: TextStyle(
+                                    color: Color(0xFF8B5A38),
+                                    fontSize: 12,
+                                  ),
                                 ),
-                              ),
-                              Text(
-                                '₱${listing.pricePerDay}/day',
-                                style: const TextStyle(
-                                  fontSize: 26,
-                                  fontWeight: FontWeight.w800,
-                                  color: Color(0xFFF4510B),
+                                Text(
+                                  '₱${listing.pricePerDay}/day',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFFF4510B),
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Security deposit',
-                                style: TextStyle(
-                                  color: Color(0xFF8B5A38),
-                                  fontSize: 12,
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Security deposit',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: Color(0xFF8B5A38),
+                                    fontSize: 12,
+                                  ),
                                 ),
-                              ),
-                              Text(
-                                listing.deposit,
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xFF211A16),
+                                Text(
+                                  listing.deposit,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF211A16),
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ],
                       ),
@@ -1043,6 +1106,40 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
                         ),
                       ],
                     ),
+                    if (widget.canManage) ...[
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: _editListing,
+                              icon: const Icon(Icons.edit_outlined),
+                              label: const Text('Edit listing'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: const Color(0xFF211A16),
+                                side: const BorderSide(
+                                  color: Color(0xFF211A16),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: _deleteListing,
+                              icon: const Icon(Icons.delete_outline),
+                              label: const Text('Delete listing'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: const Color(0xFFB3261E),
+                                side: const BorderSide(
+                                  color: Color(0xFFB3261E),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                     const SizedBox(height: 20),
                     const Text(
                       'Description',
@@ -1163,6 +1260,149 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
   }
 }
 
+class _EditListingDialog extends StatefulWidget {
+  const _EditListingDialog({required this.listing});
+
+  final RentalListing listing;
+
+  @override
+  State<_EditListingDialog> createState() => _EditListingDialogState();
+}
+
+class _EditListingDialogState extends State<_EditListingDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final _nameController = TextEditingController(text: widget.listing.name);
+  late final _conditionController = TextEditingController(
+    text: widget.listing.condition,
+  );
+  late final _locationController = TextEditingController(
+    text: widget.listing.location,
+  );
+  late final _priceController = TextEditingController(
+    text: widget.listing.pricePerDay.toString(),
+  );
+  late final _descriptionController = TextEditingController(
+    text: widget.listing.description,
+  );
+  late String _category = widget.listing.category;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _conditionController.dispose();
+    _locationController.dispose();
+    _priceController.dispose();
+    _descriptionController.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    if (!_formKey.currentState!.validate()) return;
+    final price = int.parse(_priceController.text.trim());
+    Navigator.of(context).pop(
+      RentalListing(
+        id: widget.listing.id,
+        name: _nameController.text.trim(),
+        category: _category,
+        ownerName: widget.listing.ownerName,
+        ownerAvatar: widget.listing.ownerAvatar,
+        location: _locationController.text.trim(),
+        description: _descriptionController.text.trim(),
+        condition: _conditionController.text.trim(),
+        imageUrl: widget.listing.imageUrl,
+        imageBytes: widget.listing.imageBytes,
+        deposit: widget.listing.deposit,
+        pricePerDay: price,
+        rating: widget.listing.rating,
+        isAvailable: widget.listing.isAvailable,
+        rules: widget.listing.rules,
+        reviews: widget.listing.reviews,
+      ),
+    );
+  }
+
+  String? _required(String? value) =>
+      value == null || value.trim().isEmpty ? 'Required' : null;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Edit listing'),
+      content: SizedBox(
+        width: 420,
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: _nameController,
+                  decoration: const InputDecoration(labelText: 'Item name'),
+                  validator: _required,
+                ),
+                DropdownButtonFormField<String>(
+                  initialValue: _category,
+                  decoration: const InputDecoration(labelText: 'Category'),
+                  items: rentalCategories
+                      .where((category) => category != 'All')
+                      .map(
+                        (category) => DropdownMenuItem(
+                          value: category,
+                          child: Text(category),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    if (value != null) setState(() => _category = value);
+                  },
+                ),
+                TextFormField(
+                  controller: _conditionController,
+                  decoration: const InputDecoration(labelText: 'Condition'),
+                  validator: _required,
+                ),
+                TextFormField(
+                  controller: _locationController,
+                  decoration: const InputDecoration(
+                    labelText: 'Pickup location',
+                  ),
+                  validator: _required,
+                ),
+                TextFormField(
+                  controller: _priceController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Daily rate (₱)',
+                  ),
+                  validator: (value) {
+                    final price = int.tryParse(value?.trim() ?? '');
+                    return price == null || price <= 0
+                        ? 'Enter a valid daily rate'
+                        : null;
+                  },
+                ),
+                TextFormField(
+                  controller: _descriptionController,
+                  maxLines: 3,
+                  decoration: const InputDecoration(labelText: 'Description'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(onPressed: _save, child: const Text('Save changes')),
+      ],
+    );
+  }
+}
+
 class _DetailGrid extends StatelessWidget {
   const _DetailGrid({required this.listing});
 
@@ -1184,17 +1424,18 @@ class _DetailGrid extends StatelessWidget {
         crossAxisCount: 2,
         mainAxisSpacing: 12,
         crossAxisSpacing: 12,
-        childAspectRatio: 2.4,
+        childAspectRatio: 1.8,
       ),
       itemBuilder: (_, index) {
         final item = items[index];
         return Container(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
             color: const Color(0xFFEFE2D7),
             borderRadius: BorderRadius.circular(14),
           ),
           child: Column(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
@@ -1205,11 +1446,12 @@ class _DetailGrid extends StatelessWidget {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              const Spacer(),
               Text(
                 item.value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                  fontSize: 15,
+                  fontSize: 14,
                   fontWeight: FontWeight.w800,
                   color: Color(0xFF211A16),
                 ),
@@ -1493,6 +1735,9 @@ class InboxScreen extends StatefulWidget {
     required this.conversations,
     required this.listings,
     required this.savedListingIds,
+    required this.canManageListing,
+    required this.onUpdateListing,
+    required this.onDeleteListing,
     required this.onToggleSaved,
     required this.onConversationUpdated,
     required this.onMessageOwner,
@@ -1501,6 +1746,9 @@ class InboxScreen extends StatefulWidget {
   final List<Conversation> conversations;
   final List<RentalListing> listings;
   final Set<String> savedListingIds;
+  final bool Function(RentalListing) canManageListing;
+  final ValueChanged<RentalListing> onUpdateListing;
+  final ValueChanged<RentalListing> onDeleteListing;
   final ValueChanged<RentalListing> onToggleSaved;
   final ValueChanged<Conversation> onConversationUpdated;
   final ValueChanged<RentalListing> onMessageOwner;
@@ -1540,275 +1788,321 @@ class _InboxScreenState extends State<InboxScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    const CircleAvatar(
-                      backgroundColor: Color(0xFFF4510B),
-                      radius: 16,
-                      child: Icon(
-                        Icons.shopping_bag_outlined,
-                        color: Colors.white,
-                        size: 18,
+    final unreadCount = widget.conversations
+        .where((item) => item.unread)
+        .length;
+    return _pageBody(
+      SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _brandHeader(),
+                  if (unreadCount > 0)
+                    Text(
+                      '$unreadCount unread',
+                      style: const TextStyle(
+                        color: Color(0xFFF5E7D9),
+                        fontSize: 8,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    const Text(
-                      'RentIt',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF211A16),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 18),
-            const Text(
-              'Inbox',
-              style: TextStyle(
-                fontSize: 30,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF211A16),
+                ],
               ),
-            ),
-            const SizedBox(height: 6),
-            const Text(
-              'Good rentals start with a conversation.',
-              style: TextStyle(
-                color: Color(0xFF8B5A38),
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: searchController,
-              onChanged: (_) => setState(() {}),
-              decoration: InputDecoration(
-                filled: true,
-                fillColor: Colors.white,
-                prefixIcon: const Icon(Icons.search, color: Color(0xFF8B5A38)),
-                hintText: 'Search messages',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide.none,
+              const SizedBox(height: 18),
+              const Text(
+                'Inbox',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
                 ),
               ),
-            ),
-            const SizedBox(height: 14),
-            Row(
-              children: ['All messages', 'Unread', 'Archived'].map((filter) {
-                final selected = selectedFilter == filter;
-                return Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: 8),
+              const SizedBox(height: 6),
+              const Text(
+                'Good rentals start with a conversation.',
+                style: TextStyle(color: Color(0xFFD8C9BC), fontSize: 8),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: searchController,
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: const Color(0xFF59483C),
+                  prefixIcon: const Icon(
+                    Icons.search,
+                    color: Colors.white,
+                    size: 16,
+                  ),
+                  hintText: 'Search messages',
+                  hintStyle: const TextStyle(
+                    color: Color(0xFFD8C9BC),
+                    fontSize: 9,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 9),
+                ),
+                style: const TextStyle(color: Colors.white, fontSize: 10),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: ['All messages', 'Unread', 'Archived'].map((filter) {
+                  final selected = selectedFilter == filter;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 5),
                     child: ChoiceChip(
                       label: Text(filter),
                       selected: selected,
                       onSelected: (_) =>
                           setState(() => selectedFilter = filter),
-                      selectedColor: const Color(0xFFF4510B),
-                      backgroundColor: Colors.white,
+                      selectedColor: const Color(0xFFE9E6DF),
+                      backgroundColor: const Color(0xFFF5F1EB),
                       labelStyle: TextStyle(
-                        color: selected
-                            ? Colors.white
-                            : const Color(0xFF211A16),
-                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF211A16),
+                        fontWeight: FontWeight.w600,
+                        fontSize: 8,
                       ),
                       side: BorderSide.none,
+                      visualDensity: VisualDensity.compact,
                     ),
-                  ),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 14),
-            Expanded(
-              child: visibleConversations.isEmpty
-                  ? Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.chat_bubble_outline_rounded,
-                              size: 54,
-                              color: Color(0xFFB9A79A),
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              widget.conversations.isEmpty
-                                  ? 'No conversations yet'
-                                  : 'No messages found',
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
-                                color: Color(0xFF211A16),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 14),
+              Expanded(
+                child: visibleConversations.isEmpty
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.chat_bubble_outline_rounded,
+                                size: 54,
+                                color: Color(0xFFD8C9BC),
                               ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              widget.conversations.isEmpty
-                                  ? 'Message an owner to start a conversation.'
-                                  : 'Try changing your search or message filter.',
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                color: Color(0xFF8B5A38),
-                                height: 1.4,
+                              const SizedBox(height: 16),
+                              Text(
+                                widget.conversations.isEmpty
+                                    ? 'No conversations yet'
+                                    : 'No messages found',
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    )
-                  : ListView.separated(
-                      itemCount: visibleConversations.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 12),
-                      itemBuilder: (context, index) {
-                        final conversation = visibleConversations[index];
-                        return InkWell(
-                          onTap: () => Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => ChatScreen(
-                                conversation: conversation,
-                                listing: widget.listings
-                                    .where(
-                                      (item) =>
-                                          item.name == conversation.itemName,
-                                    )
-                                    .firstOrNull,
-                                isSaved: widget.listings
-                                    .where(
-                                      (item) =>
-                                          item.name == conversation.itemName,
-                                    )
-                                    .any(
-                                      (item) => widget.savedListingIds.contains(
-                                        item.id,
-                                      ),
-                                    ),
-                                onToggleSaved: widget.onToggleSaved,
-                                onConversationUpdated:
-                                    widget.onConversationUpdated,
-                                onMessageOwner: widget.onMessageOwner,
+                              const SizedBox(height: 8),
+                              Text(
+                                widget.conversations.isEmpty
+                                    ? 'Message an owner to start a conversation.'
+                                    : 'Try changing your search or message filter.',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: Color(0xFFD8C9BC),
+                                  height: 1.4,
+                                ),
                               ),
-                            ),
+                            ],
                           ),
-                          child: Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(16),
+                        ),
+                      )
+                    : ListView.separated(
+                        itemCount: visibleConversations.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 12),
+                        itemBuilder: (context, index) {
+                          final conversation = visibleConversations[index];
+                          return InkWell(
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => ChatScreen(
+                                  conversation: conversation,
+                                  listing: widget.listings
+                                      .where(
+                                        (item) =>
+                                            item.name == conversation.itemName,
+                                      )
+                                      .firstOrNull,
+                                  isSaved: widget.listings
+                                      .where(
+                                        (item) =>
+                                            item.name == conversation.itemName,
+                                      )
+                                      .any(
+                                        (item) => widget.savedListingIds
+                                            .contains(item.id),
+                                      ),
+                                  canManageListing: widget.canManageListing,
+                                  onUpdateListing: widget.onUpdateListing,
+                                  onDeleteListing: widget.onDeleteListing,
+                                  onToggleSaved: widget.onToggleSaved,
+                                  onConversationUpdated:
+                                      widget.onConversationUpdated,
+                                  onMessageOwner: widget.onMessageOwner,
+                                ),
+                              ),
                             ),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                CircleAvatar(
-                                  radius: 25,
-                                  backgroundColor: const Color(0xFFE7D4C0),
-                                  child: Text(
-                                    conversation.avatarText,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w800,
-                                      color: Color(0xFF211A16),
-                                    ),
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.transparent,
+                                border: Border(
+                                  bottom: BorderSide(
+                                    color: Colors.white.withValues(alpha: 0.13),
                                   ),
                                 ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Expanded(
-                                            child: Text(
-                                              conversation.participantName,
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.w800,
-                                                color: Color(0xFF211A16),
-                                              ),
-                                            ),
-                                          ),
-                                          Text(
-                                            _formatTime(
-                                              conversation.lastUpdated,
-                                            ),
-                                            style: const TextStyle(
-                                              color: Color(0xFF8B5A38),
-                                              fontSize: 11,
-                                            ),
-                                          ),
-                                        ],
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  CircleAvatar(
+                                    radius: 25,
+                                    backgroundColor: const Color(0xFF8A6448),
+                                    child: Text(
+                                      conversation.avatarText,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        color: Colors.white,
                                       ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        conversation.itemName,
-                                        style: const TextStyle(
-                                          color: Color(0xFF8B5A38),
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 6),
-                                      Row(
-                                        children: [
-                                          Expanded(
-                                            child: Text(
-                                              conversation.preview,
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: const TextStyle(
-                                                color: Color(0xFF4C403B),
-                                              ),
-                                            ),
-                                          ),
-                                          if (conversation.unread)
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 7,
-                                                    vertical: 4,
-                                                  ),
-                                              decoration: const BoxDecoration(
-                                                color: Color(0xFFF4510B),
-                                                borderRadius: BorderRadius.all(
-                                                  Radius.circular(999),
-                                                ),
-                                              ),
-                                              child: const Text(
-                                                '1',
-                                                style: TextStyle(
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                conversation.participantName,
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.w800,
                                                   color: Colors.white,
                                                   fontSize: 10,
-                                                  fontWeight: FontWeight.w700,
                                                 ),
                                               ),
                                             ),
-                                        ],
-                                      ),
-                                    ],
+                                            Text(
+                                              _formatTime(
+                                                conversation.lastUpdated,
+                                              ),
+                                              style: const TextStyle(
+                                                color: Color(0xFFD9C4B2),
+                                                fontSize: 7,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          conversation.itemName,
+                                          style: const TextStyle(
+                                            color: Color(0xFFD9C4B2),
+                                            fontSize: 7,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                conversation.preview,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  color: Color(0xFFF0E8E1),
+                                                  fontSize: 8,
+                                                ),
+                                              ),
+                                            ),
+                                            if (conversation.unread)
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 7,
+                                                      vertical: 4,
+                                                    ),
+                                                decoration: const BoxDecoration(
+                                                  color: Color(0xFFF4510B),
+                                                  borderRadius:
+                                                      BorderRadius.all(
+                                                        Radius.circular(999),
+                                                      ),
+                                                ),
+                                                child: const Text(
+                                                  '1',
+                                                  style: TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.w700,
+                                                  ),
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF59402D),
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(
+                      Icons.verified_user_outlined,
+                      color: Color(0xFFF5E7D9),
+                      size: 14,
+                    ),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Keep it on RentIt',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 8,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
-                        );
-                      },
+                          Text(
+                            'Chat and pay here for a safer rental experience.',
+                            style: TextStyle(
+                              color: Color(0xFFD8C9BC),
+                              fontSize: 7,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-            ),
-          ],
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1831,6 +2125,9 @@ class ChatScreen extends StatefulWidget {
     required this.conversation,
     this.listing,
     this.isSaved = false,
+    required this.canManageListing,
+    required this.onUpdateListing,
+    required this.onDeleteListing,
     this.onToggleSaved,
     required this.onConversationUpdated,
     required this.onMessageOwner,
@@ -1839,6 +2136,9 @@ class ChatScreen extends StatefulWidget {
   final Conversation conversation;
   final RentalListing? listing;
   final bool isSaved;
+  final bool Function(RentalListing) canManageListing;
+  final ValueChanged<RentalListing> onUpdateListing;
+  final ValueChanged<RentalListing> onDeleteListing;
   final ValueChanged<RentalListing>? onToggleSaved;
   final ValueChanged<Conversation> onConversationUpdated;
   final ValueChanged<RentalListing> onMessageOwner;
@@ -1923,6 +2223,14 @@ class _ChatScreenState extends State<ChatScreen> {
                         (item) => item.name == widget.conversation.itemName,
                       ),
                   isSaved: widget.isSaved,
+                  canManage: widget.canManageListing(
+                    widget.listing ??
+                        sampleListings.firstWhere(
+                          (item) => item.name == widget.conversation.itemName,
+                        ),
+                  ),
+                  onUpdateListing: widget.onUpdateListing,
+                  onDeleteListing: widget.onDeleteListing,
                   onToggleSaved: widget.onToggleSaved ?? (_) {},
                   onMessageOwner: widget.onMessageOwner,
                 ),
@@ -2117,11 +2425,6 @@ class _ListItemScreenState extends State<ListItemScreen> {
       return;
     }
 
-    final rules = rulesController.text
-        .split('\n')
-        .map((rule) => rule.trim())
-        .where((rule) => rule.isNotEmpty)
-        .toList();
     final listing = RentalListing(
       id: 'listing-${DateTime.now().microsecondsSinceEpoch}',
       name: name,
@@ -2145,7 +2448,11 @@ class _ListItemScreenState extends State<ListItemScreen> {
       pricePerDay: price,
       rating: 0,
       isAvailable: true,
-      rules: rules,
+      rules: rulesController.text
+          .split('\n')
+          .map((rule) => rule.trim())
+          .where((rule) => rule.isNotEmpty)
+          .toList(),
       reviews: const [],
     );
     setState(() => isPublishing = true);
@@ -2177,229 +2484,501 @@ class _ListItemScreenState extends State<ListItemScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'List an item',
-              style: TextStyle(
-                fontSize: 30,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF211A16),
+    return _pageBody(
+      SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _brandHeader(),
+              const SizedBox(height: 17),
+              const Text(
+                'List Item',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Create a listing and reach people nearby.',
-              style: TextStyle(
-                color: Color(0xFF8B5A38),
-                fontWeight: FontWeight.w600,
+              const SizedBox(height: 4),
+              const Text(
+                'Turn your everyday things into extra income.',
+                style: TextStyle(color: Color(0xFFD8C9BC), fontSize: 8),
               ),
-            ),
-            const SizedBox(height: 20),
-            TextField(
-              controller: titleController,
-              decoration: const InputDecoration(
-                labelText: 'Item title',
-                border: OutlineInputBorder(),
+              const SizedBox(height: 14),
+              const Text(
+                'Item photos',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
-            ),
-            const SizedBox(height: 14),
-            DropdownButtonFormField<String>(
-              value: category,
-              decoration: const InputDecoration(
-                labelText: 'Category',
-                border: OutlineInputBorder(),
-              ),
-              items: rentalCategories.where((value) => value != 'All').map((
-                value,
-              ) {
-                return DropdownMenuItem<String>(
-                  value: value,
-                  child: Text(value),
-                );
-              }).toList(),
-              onChanged: (value) => setState(() => category = value ?? 'Tech'),
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: locationController,
-              decoration: const InputDecoration(
-                labelText: 'Pickup location',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: priceController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Daily rate (₱)',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: descriptionController,
-              maxLines: 4,
-              decoration: const InputDecoration(
-                labelText: 'Description',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 18),
-            TextField(
-              controller: conditionController,
-              decoration: const InputDecoration(
-                labelText: 'Condition',
-                hintText: 'e.g. Like new, good, or fair',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: rulesController,
-              maxLines: 4,
-              decoration: const InputDecoration(
-                labelText: 'Rental rules',
-                hintText: 'Enter one rule per line',
-                helperText: 'These rules are shown on your listing.',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 18),
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Row(
-                children: [
-                  if (imageBytes == null)
-                    const Icon(
-                      Icons.camera_alt_outlined,
-                      color: Color(0xFFF4510B),
-                      size: 28,
-                    )
-                  else
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.memory(
-                        imageBytes!,
-                        width: 44,
-                        height: 44,
-                        fit: BoxFit.cover,
+              const SizedBox(height: 5),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF38271C),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFF72513A)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 52,
+                      height: 46,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF59534E),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: imageBytes == null
+                          ? const Icon(
+                              Icons.camera_alt_rounded,
+                              color: Colors.white,
+                              size: 22,
+                            )
+                          : Image.memory(imageBytes!, fit: BoxFit.cover),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: _pickImage,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          side: const BorderSide(color: Color(0xFF8A6448)),
+                          padding: const EdgeInsets.symmetric(vertical: 7),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: Column(
+                          children: [
+                            const Icon(
+                              Icons.add_photo_alternate_outlined,
+                              size: 15,
+                            ),
+                            Text(
+                              imageBytes == null
+                                  ? 'Add photos'
+                                  : 'Change photo',
+                              style: const TextStyle(fontSize: 8),
+                            ),
+                            const Text(
+                              'Show every angle',
+                              style: TextStyle(
+                                color: Color(0xFFD8C9BC),
+                                fontSize: 7,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  const SizedBox(width: 12),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 9),
+              TextField(
+                controller: titleController,
+                style: const TextStyle(color: Colors.white, fontSize: 9),
+                decoration: _designInputDecoration('Item name *'),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
                   Expanded(
-                    child: Text(
-                      imageBytes == null
-                          ? 'Upload item photos'
-                          : 'Photo selected',
+                    child: DropdownButtonFormField<String>(
+                      initialValue: category,
+                      decoration: _designInputDecoration('Category *'),
+                      dropdownColor: const Color(0xFF38271C),
+                      style: const TextStyle(color: Colors.white, fontSize: 9),
+                      items: rentalCategories
+                          .where((value) => value != 'All')
+                          .map((value) {
+                            return DropdownMenuItem<String>(
+                              value: value,
+                              child: Text(value),
+                            );
+                          })
+                          .toList(),
+                      onChanged: (value) =>
+                          setState(() => category = value ?? 'Tech'),
                     ),
                   ),
-                  TextButton(
-                    onPressed: _pickImage,
-                    child: Text(imageBytes == null ? 'Add' : 'Change'),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextField(
+                      controller: conditionController,
+                      style: const TextStyle(color: Colors.white, fontSize: 9),
+                      decoration: _designInputDecoration('Condition *'),
+                    ),
                   ),
                 ],
               ),
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: isPublishing ? null : _publish,
-                style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFFF4510B),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
+              const SizedBox(height: 8),
+              TextField(
+                controller: priceController,
+                keyboardType: TextInputType.number,
+                style: const TextStyle(color: Colors.white, fontSize: 9),
+                decoration: _designInputDecoration('Daily rate (₱) *'),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: descriptionController,
+                maxLines: 2,
+                style: const TextStyle(color: Colors.white, fontSize: 9),
+                decoration: _designInputDecoration('Description *'),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: rulesController,
+                maxLines: 3,
+                style: const TextStyle(color: Colors.white, fontSize: 9),
+                decoration: _designInputDecoration('Rental rules').copyWith(
+                  hintText: 'Enter one rule per line',
+                  helperText: 'Shown to renters on your listing.',
+                  helperStyle: const TextStyle(
+                    color: Color(0xFFD8C9BC),
+                    fontSize: 7,
                   ),
                 ),
-                child: isPublishing
-                    ? const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Text('Publish listing'),
               ),
-            ),
-          ],
+              const SizedBox(height: 8),
+              TextField(
+                controller: locationController,
+                style: const TextStyle(color: Colors.white, fontSize: 9),
+                decoration: _designInputDecoration('Pickup location *')
+                    .copyWith(
+                      suffixIcon: const Icon(
+                        Icons.location_on_outlined,
+                        color: Color(0xFFD8C9BC),
+                        size: 15,
+                      ),
+                    ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: isPublishing ? null : _publish,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFFF4510B),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 11),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: isPublishing
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text(
+                          'Publish listing',
+                          style: TextStyle(fontSize: 9),
+                        ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class ActivityScreen extends StatelessWidget {
-  const ActivityScreen({super.key});
+class ActivityScreen extends StatefulWidget {
+  const ActivityScreen({
+    super.key,
+    required this.listings,
+    required this.onMessageOwner,
+  });
+
+  final List<RentalListing> listings;
+  final ValueChanged<RentalListing> onMessageOwner;
+
+  @override
+  State<ActivityScreen> createState() => _ActivityScreenState();
+}
+
+class _ActivityScreenState extends State<ActivityScreen> {
+  static const _allStatuses = [
+    'All',
+    'Pending',
+    'Confirmed',
+    'Completed',
+    'Refund requested',
+  ];
+
+  final TextEditingController _searchController = TextEditingController();
+  String _selectedStatus = 'All';
+  final List<_ActivityEntry> _activities = [
+    _ActivityEntry(
+      title: 'Sony Alpha a7 III Camera Kit',
+      status: 'Pending',
+      detail: 'Requested for 3 days · ₱1,800 total',
+      listingId: 'cam-1',
+    ),
+    _ActivityEntry(
+      title: 'Nintendo Switch OLED',
+      status: 'Confirmed',
+      detail: 'Pickup tomorrow · 4.8 rating',
+      listingId: 'game-1',
+    ),
+    _ActivityEntry(
+      title: 'Bosch Cordless Drill',
+      status: 'Completed',
+      detail: 'Returned on Oct 24 · Deposit refunded',
+      listingId: 'tool-1',
+    ),
+  ];
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  List<_ActivityEntry> get _visibleActivities {
+    final query = _searchController.text.trim().toLowerCase();
+    return _activities.where((activity) {
+      final matchesStatus =
+          _selectedStatus == 'All' || activity.status == _selectedStatus;
+      final matchesSearch =
+          query.isEmpty ||
+          activity.title.toLowerCase().contains(query) ||
+          activity.status.toLowerCase().contains(query) ||
+          activity.detail.toLowerCase().contains(query);
+      return matchesStatus && matchesSearch;
+    }).toList();
+  }
+
+  Future<void> _deleteActivity(_ActivityEntry activity) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete activity?'),
+        content: Text('Remove “${activity.title}” from your activity?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _activities.remove(activity));
+  }
+
+  void _showActivityDetails(_ActivityEntry activity) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(activity.title),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Status: ${activity.status}'),
+            const SizedBox(height: 8),
+            Text(activity.detail),
+          ],
+        ),
+        actions: [
+          if (activity.status == 'Pending')
+            TextButton(
+              onPressed: () =>
+                  _updateActivityStatus(dialogContext, activity, 'Confirmed'),
+              child: const Text('Confirm rental'),
+            ),
+          if (activity.status == 'Confirmed')
+            TextButton(
+              onPressed: () =>
+                  _updateActivityStatus(dialogContext, activity, 'Completed'),
+              child: const Text('Mark completed'),
+            ),
+          if (activity.status == 'Confirmed' || activity.status == 'Completed')
+            TextButton(
+              onPressed: () => _updateActivityStatus(
+                dialogContext,
+                activity,
+                'Refund requested',
+              ),
+              child: const Text('Request a refund'),
+            ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _updateActivityStatus(
+    BuildContext dialogContext,
+    _ActivityEntry activity,
+    String status,
+  ) {
+    setState(() => activity.status = status);
+    Navigator.pop(dialogContext);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Activity status updated to $status.')),
+    );
+  }
+
+  void _messageOwner(_ActivityEntry activity) {
+    final matches = widget.listings.where(
+      (listing) => listing.id == activity.listingId,
+    );
+    if (matches.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This listing is no longer available.')),
+      );
+      return;
+    }
+    widget.onMessageOwner(matches.first);
+  }
 
   @override
   Widget build(BuildContext context) {
-    final activities = [
-      _ActivityCard(
-        title: 'Sony Alpha a7 III Camera Kit',
-        status: 'Pending approval',
-        detail: 'Requested for 3 days · ₱1,800 total',
-      ),
-      _ActivityCard(
-        title: 'Nintendo Switch OLED',
-        status: 'Confirmed',
-        detail: 'Pickup tomorrow · 4.8 rating',
-      ),
-      _ActivityCard(
-        title: 'Bosch Cordless Drill',
-        status: 'Completed',
-        detail: 'Returned on Oct 24 · Deposit refunded',
-      ),
-    ];
-
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Activity',
-              style: TextStyle(
-                fontSize: 30,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF211A16),
+    return _pageBody(
+      SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _brandHeader(),
+              const SizedBox(height: 17),
+              const Text(
+                'Activity',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                ),
               ),
-            ),
-            const SizedBox(height: 6),
-            const Text(
-              'Your rental requests and bookings.',
-              style: TextStyle(
-                color: Color(0xFF8B5A38),
-                fontWeight: FontWeight.w600,
+              const SizedBox(height: 4),
+              const Text(
+                'Every rental, all in one place.',
+                style: TextStyle(color: Color(0xFFD8C9BC), fontSize: 8),
               ),
-            ),
-            const SizedBox(height: 18),
-            Expanded(
-              child: ListView.separated(
-                itemCount: activities.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 12),
-                itemBuilder: (_, index) => activities[index],
+              const SizedBox(height: 14),
+              TextField(
+                controller: _searchController,
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: const Color(0xFF51473F),
+                  prefixIcon: const Icon(Icons.search, color: Colors.white),
+                  hintText: 'Search activity...',
+                  hintStyle: const TextStyle(
+                    color: Color(0xFFD4CCC6),
+                    fontSize: 10,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFF75685F)),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                ),
+                style: const TextStyle(color: Colors.white, fontSize: 11),
               ),
-            ),
-          ],
+              const SizedBox(height: 10),
+              SizedBox(
+                height: 34,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _allStatuses.length,
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(width: 8),
+                  itemBuilder: (_, index) {
+                    final status = _allStatuses[index];
+                    final selected = status == _selectedStatus;
+                    return ChoiceChip(
+                      label: Text(status),
+                      selected: selected,
+                      onSelected: (_) =>
+                          setState(() => _selectedStatus = status),
+                      labelStyle: TextStyle(
+                        color: selected
+                            ? const Color(0xFF211A16)
+                            : Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      selectedColor: const Color(0xFFFFB27F),
+                      backgroundColor: const Color(0xFF51473F),
+                      side: BorderSide.none,
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 10),
+              Expanded(
+                child: _visibleActivities.isEmpty
+                    ? const Center(
+                        child: Text(
+                          'No matching activity.',
+                          style: TextStyle(color: Color(0xFFD8C9BC)),
+                        ),
+                      )
+                    : ListView.separated(
+                        itemCount: _visibleActivities.length,
+                        separatorBuilder: (context, index) =>
+                            const SizedBox(height: 12),
+                        itemBuilder: (_, index) {
+                          final activity = _visibleActivities[index];
+                          return _ActivityCard(
+                            title: activity.title,
+                            status: activity.status,
+                            detail: activity.detail,
+                            onTap: () => _showActivityDetails(activity),
+                            onMessageOwner: () => _messageOwner(activity),
+                            onDelete: () => _deleteActivity(activity),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
+}
+
+class _ActivityEntry {
+  _ActivityEntry({
+    required this.title,
+    required this.status,
+    required this.detail,
+    required this.listingId,
+  });
+
+  final String title;
+  String status;
+  final String detail;
+  final String listingId;
 }
 
 class _ActivityCard extends StatelessWidget {
@@ -2408,91 +2987,108 @@ class _ActivityCard extends StatelessWidget {
     required this.title,
     required this.status,
     required this.detail,
+    required this.onTap,
+    required this.onMessageOwner,
+    required this.onDelete,
   });
 
   final String title;
   final String status;
   final String detail;
+  final VoidCallback onTap;
+  final VoidCallback onMessageOwner;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
-    final color = status == 'Confirmed'
-        ? const Color(0xFF6E8B75)
-        : status == 'Completed'
-        ? const Color(0xFF8B5A38)
-        : const Color(0xFFF4510B);
+    final color = switch (status) {
+      'Confirmed' => const Color(0xFF6E8B75),
+      'Completed' => const Color(0xFF8B5A38),
+      'Refund requested' => const Color(0xFFB36B9A),
+      _ => const Color(0xFFF4510B),
+    };
 
     return Material(
-      color: Colors.white,
+      color: const Color(0xFF493A2F),
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        onTap: () => showDialog<void>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: Text(title),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Status: $status'),
-                const SizedBox(height: 8),
-                Text(detail),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Close'),
-              ),
-            ],
-          ),
-        ),
+        onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
+          padding: const EdgeInsets.all(14),
+          child: Column(
             children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(Icons.receipt_long_rounded, color: color),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
+              Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(Icons.receipt_long_rounded, color: color),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          detail,
+                          style: const TextStyle(color: Color(0xFFD8C9BC)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      status,
+                      style: TextStyle(
+                        color: color,
+                        fontSize: 11,
                         fontWeight: FontWeight.w800,
-                        color: Color(0xFF211A16),
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      detail,
-                      style: const TextStyle(color: Color(0xFF8B5A38)),
+                  ),
+                  IconButton(
+                    tooltip: 'Delete activity',
+                    onPressed: onDelete,
+                    visualDensity: VisualDensity.compact,
+                    icon: const Icon(
+                      Icons.delete_outline,
+                      color: Color(0xFFD8C9BC),
+                      size: 18,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  status,
-                  style: TextStyle(
-                    color: color,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: onMessageOwner,
+                  icon: const Icon(Icons.chat_bubble_outline, size: 16),
+                  label: const Text('Message owner'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFFFFB27F),
+                    visualDensity: VisualDensity.compact,
                   ),
                 ),
               ),
@@ -2510,6 +3106,9 @@ class ProfileScreen extends StatelessWidget {
     required this.name,
     required this.email,
     required this.location,
+    required this.canManageListing,
+    required this.onUpdateListing,
+    required this.onDeleteListing,
     required this.savedListings,
     required this.myListings,
     required this.onUpdate,
@@ -2520,6 +3119,9 @@ class ProfileScreen extends StatelessWidget {
   final String name;
   final String email;
   final String location;
+  final bool Function(RentalListing) canManageListing;
+  final ValueChanged<RentalListing> onUpdateListing;
+  final ValueChanged<RentalListing> onDeleteListing;
   final List<RentalListing> savedListings;
   final List<RentalListing> myListings;
   final void Function({
@@ -2596,6 +3198,9 @@ class ProfileScreen extends StatelessWidget {
                               isSaved: savedListings.any(
                                 (item) => item.id == listing.id,
                               ),
+                              canManage: canManageListing(listing),
+                              onUpdateListing: onUpdateListing,
+                              onDeleteListing: onDeleteListing,
                               onToggleSaved: onToggleSaved,
                               onMessageOwner: onMessageOwner,
                             ),
@@ -2618,124 +3223,138 @@ class ProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: ListView(
-        padding: const EdgeInsets.all(18),
-        children: [
-          const Text(
-            'Profile',
-            style: TextStyle(
-              fontSize: 30,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF211A16),
+    return _pageBody(
+      SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+          children: [
+            _brandHeader(),
+            const SizedBox(height: 17),
+            const Text(
+              'Profile',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+              ),
             ),
-          ),
-          const SizedBox(height: 18),
-          Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
+            const SizedBox(height: 4),
+            const Text(
+              'Your account, your rental community.',
+              style: TextStyle(color: Color(0xFFD8C9BC), fontSize: 8),
             ),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 30,
-                  backgroundColor: const Color(0xFFF4510B),
-                  child: Text(
-                    name.trim().isEmpty
-                        ? '?'
-                        : name
-                              .trim()
-                              .split(RegExp(r'\s+'))
-                              .take(2)
-                              .map((part) => part[0])
-                              .join()
-                              .toUpperCase(),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 20,
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF493A2F),
+                borderRadius: BorderRadius.circular(13),
+                border: Border.all(color: const Color(0xFF70543F)),
+              ),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 23,
+                    backgroundColor: const Color(0xFF9B633D),
+                    child: Text(
+                      name.trim().isEmpty
+                          ? '?'
+                          : name
+                                .trim()
+                                .split(RegExp(r'\s+'))
+                                .take(2)
+                                .map((part) => part[0])
+                                .join()
+                                .toUpperCase(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        name,
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF211A16),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        email,
-                        style: const TextStyle(color: Color(0xFF8B5A38)),
-                      ),
-                      Text(
-                        location,
-                        style: const TextStyle(color: Color(0xFF8B5A38)),
-                      ),
-                    ],
+                        const SizedBox(height: 3),
+                        Text(
+                          email,
+                          style: const TextStyle(
+                            color: Color(0xFFD8C9BC),
+                            fontSize: 7,
+                          ),
+                        ),
+                        Text(
+                          location,
+                          style: const TextStyle(
+                            color: Color(0xFFD8C9BC),
+                            fontSize: 7,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                IconButton(
-                  tooltip: 'Edit profile',
-                  onPressed: () => _editProfile(context),
-                  icon: const Icon(
-                    Icons.edit_outlined,
-                    color: Color(0xFFF4510B),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-          _profileAction(
-            title: 'My Listings',
-            trailing: '${myListings.length} items',
-            onTap: () => _showListings(
-              context,
-              title: 'My Listings',
-              listings: myListings,
-              allowSave: false,
-            ),
-          ),
-          _profileAction(
-            title: 'Payment methods',
-            trailing: 'Manage',
-            onTap: () => showDialog<void>(
-              context: context,
-              builder: (context) => AlertDialog(
-                title: const Text('Payment methods'),
-                content: const Text(
-                  'Payment options are selected securely during checkout.',
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Close'),
+                  IconButton(
+                    tooltip: 'Edit profile',
+                    onPressed: () => _editProfile(context),
+                    icon: const Icon(
+                      Icons.edit_outlined,
+                      color: Color(0xFFF4510B),
+                    ),
                   ),
                 ],
               ),
             ),
-          ),
-          _profileAction(
-            title: 'Saved items',
-            trailing: '${savedListings.length} saved',
-            onTap: () => _showListings(
-              context,
-              title: 'Saved items',
-              listings: savedListings,
-              allowSave: true,
+            const SizedBox(height: 14),
+            _profileAction(
+              title: 'My Listings',
+              trailing: '${myListings.length} items',
+              onTap: () => _showListings(
+                context,
+                title: 'My Listings',
+                listings: myListings,
+                allowSave: false,
+              ),
             ),
-          ),
-        ],
+            _profileAction(
+              title: 'Saved items',
+              trailing: '${savedListings.length} saved',
+              onTap: () => _showListings(
+                context,
+                title: 'Saved items',
+                listings: savedListings,
+                allowSave: true,
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('You have been logged out.')),
+                  );
+                },
+                icon: const Icon(Icons.logout_rounded),
+                label: const Text('Log out'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  side: const BorderSide(color: Color(0xFF9A7456)),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -2748,13 +3367,13 @@ class ProfileScreen extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       child: Material(
-        color: Colors.white,
+        color: const Color(0xFF493A2F),
         borderRadius: BorderRadius.circular(14),
         child: InkWell(
           borderRadius: BorderRadius.circular(14),
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             child: Row(
               children: [
                 Expanded(
@@ -2762,7 +3381,8 @@ class ProfileScreen extends StatelessWidget {
                     title,
                     style: const TextStyle(
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFF211A16),
+                      color: Colors.white,
+                      fontSize: 9,
                     ),
                   ),
                 ),
@@ -2774,12 +3394,17 @@ class ProfileScreen extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.end,
                     style: const TextStyle(
-                      color: Color(0xFF8B5A38),
+                      color: Color(0xFFD8C9BC),
+                      fontSize: 7,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
-                const Icon(Icons.chevron_right_rounded),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: Color(0xFFD8C9BC),
+                  size: 15,
+                ),
               ],
             ),
           ),

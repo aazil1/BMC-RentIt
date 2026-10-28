@@ -1,3 +1,4 @@
+// Creates rental payment invoices and provides demo products.
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/app_config.dart';

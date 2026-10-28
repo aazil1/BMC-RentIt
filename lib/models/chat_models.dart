@@ -1,3 +1,4 @@
+// Data models for rental conversations and chat messages.
 class ChatMessage {
   final String id;
   final String text;
