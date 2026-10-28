@@ -2794,6 +2794,12 @@ class _ActivityScreenState extends State<ActivityScreen> {
             Text('Status: ${activity.status}'),
             const SizedBox(height: 8),
             Text(activity.detail),
+            if (activity.review case final review?) ...[
+              const SizedBox(height: 12),
+              Text('Your review: ${review.rating.toStringAsFixed(0)}/5'),
+              const SizedBox(height: 4),
+              Text(review.comment),
+            ],
           ],
         ),
         actions: [
@@ -2818,12 +2824,37 @@ class _ActivityScreenState extends State<ActivityScreen> {
               ),
               child: const Text('Request a refund'),
             ),
+          if (activity.status == 'Completed')
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                _showReviewDialog(activity);
+              },
+              child: Text(
+                activity.review == null ? 'Write a review' : 'Edit review',
+              ),
+            ),
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Close'),
           ),
         ],
       ),
+    );
+  }
+
+  Future<void> _showReviewDialog(_ActivityEntry activity) async {
+    final review = await showDialog<Review>(
+      context: context,
+      builder: (context) => _CreateReviewDialog(
+        rentalName: activity.title,
+        initialReview: activity.review,
+      ),
+    );
+    if (review == null || !mounted) return;
+    setState(() => activity.review = review);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Your review has been saved.')),
     );
   }
 
@@ -2952,8 +2983,10 @@ class _ActivityScreenState extends State<ActivityScreen> {
                             title: activity.title,
                             status: activity.status,
                             detail: activity.detail,
+                            review: activity.review,
                             onTap: () => _showActivityDetails(activity),
                             onMessageOwner: () => _messageOwner(activity),
+                            onReview: () => _showReviewDialog(activity),
                             onDelete: () => _deleteActivity(activity),
                           );
                         },
@@ -2979,6 +3012,7 @@ class _ActivityEntry {
   String status;
   final String detail;
   final String listingId;
+  Review? review;
 }
 
 class _ActivityCard extends StatelessWidget {
@@ -2987,16 +3021,20 @@ class _ActivityCard extends StatelessWidget {
     required this.title,
     required this.status,
     required this.detail,
+    required this.review,
     required this.onTap,
     required this.onMessageOwner,
+    required this.onReview,
     required this.onDelete,
   });
 
   final String title;
   final String status;
   final String detail;
+  final Review? review;
   final VoidCallback onTap;
   final VoidCallback onMessageOwner;
+  final VoidCallback onReview;
   final VoidCallback onDelete;
 
   @override
@@ -3080,22 +3118,177 @@ class _ActivityCard extends StatelessWidget {
                   ),
                 ],
               ),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton.icon(
-                  onPressed: onMessageOwner,
-                  icon: const Icon(Icons.chat_bubble_outline, size: 16),
-                  label: const Text('Message owner'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: const Color(0xFFFFB27F),
-                    visualDensity: VisualDensity.compact,
+              if (review != null)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      'Your review · ${review!.rating.toStringAsFixed(0)}/5 · ${review!.comment}',
+                      style: const TextStyle(
+                        color: Color(0xFFD8C9BC),
+                        fontSize: 12,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ),
+              Wrap(
+                spacing: 8,
+                children: [
+                  TextButton.icon(
+                    onPressed: onMessageOwner,
+                    icon: const Icon(Icons.chat_bubble_outline, size: 16),
+                    label: const Text('Message owner'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: const Color(0xFFFFB27F),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+                  if (status == 'Completed')
+                    TextButton.icon(
+                      onPressed: onReview,
+                      icon: const Icon(Icons.star_outline_rounded, size: 16),
+                      label: Text(
+                        review == null ? 'Write a review' : 'Edit review',
+                      ),
+                      style: TextButton.styleFrom(
+                        foregroundColor: const Color(0xFFFFB27F),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ),
+                ],
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+class _CreateReviewDialog extends StatefulWidget {
+  const _CreateReviewDialog({required this.rentalName, this.initialReview});
+
+  final String rentalName;
+  final Review? initialReview;
+
+  @override
+  State<_CreateReviewDialog> createState() => _CreateReviewDialogState();
+}
+
+class _CreateReviewDialogState extends State<_CreateReviewDialog> {
+  late final TextEditingController _commentController;
+  late int _rating;
+  bool _showValidation = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _rating = widget.initialReview?.rating.round() ?? 0;
+    _commentController = TextEditingController(
+      text: widget.initialReview?.comment ?? '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _commentController.dispose();
+    super.dispose();
+  }
+
+  void _saveReview() {
+    final comment = _commentController.text.trim();
+    if (_rating == 0 || comment.isEmpty) {
+      setState(() => _showValidation = true);
+      return;
+    }
+
+    Navigator.pop(
+      context,
+      Review(reviewerName: 'You', comment: comment, rating: _rating.toDouble()),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(
+        widget.initialReview == null
+            ? 'Review your rental'
+            : 'Edit your review',
+      ),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(widget.rentalName),
+            const SizedBox(height: 16),
+            const Text(
+              'Rate your experience',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: List.generate(
+                5,
+                (index) => IconButton(
+                  tooltip: '${index + 1} star${index == 0 ? '' : 's'}',
+                  onPressed: () => setState(() {
+                    _rating = index + 1;
+                    _showValidation = false;
+                  }),
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 40,
+                    minHeight: 40,
+                  ),
+                  icon: Icon(
+                    index < _rating
+                        ? Icons.star_rounded
+                        : Icons.star_outline_rounded,
+                    color: const Color(0xFFFFB27F),
+                    size: 32,
+                  ),
+                ),
+              ),
+            ),
+            TextField(
+              controller: _commentController,
+              minLines: 3,
+              maxLines: 5,
+              maxLength: 500,
+              onChanged: (_) {
+                if (_showValidation) setState(() => _showValidation = false);
+              },
+              decoration: const InputDecoration(
+                labelText: 'Comment',
+                hintText: 'How was your rental experience?',
+                alignLabelWithHint: true,
+                border: OutlineInputBorder(),
+              ),
+            ),
+            if (_showValidation)
+              const Text(
+                'Select a star rating and enter a comment.',
+                style: TextStyle(color: Color(0xFFB3261E), fontSize: 12),
+              ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _saveReview,
+          child: Text(widget.initialReview == null ? 'Submit review' : 'Save'),
+        ),
+      ],
     );
   }
 }

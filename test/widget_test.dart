@@ -212,6 +212,33 @@ void main() {
     expect(find.text('Nintendo Switch OLED'), findsNothing);
   });
 
+  testWidgets('Completed rentals can be reviewed', (tester) async {
+    await tester.pumpWidget(RentItApp(listingService: _FakeListingService()));
+    await tester.tap(find.text('Activity').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Bosch Cordless Drill'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Write a review'), findsNWidgets(2));
+    await tester.tap(find.text('Write a review').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Review your rental'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('4 stars'));
+    await tester.enterText(
+      find.byType(TextField).last,
+      'The drill worked great.',
+    );
+    await tester.tap(find.text('Submit review'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.textContaining('Your review · 4/5 · The drill worked great.'),
+      findsOneWidget,
+    );
+    expect(find.text('Edit review'), findsOneWidget);
+  });
+
   testWidgets('Activity status can move through simulated rental stages', (
     tester,
   ) async {
