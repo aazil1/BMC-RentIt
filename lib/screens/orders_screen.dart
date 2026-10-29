@@ -1,16 +1,13 @@
 // Displays orders fetched from Supabase.
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../services/payment_service.dart';
 
 class OrdersScreen extends StatelessWidget {
   const OrdersScreen({super.key});
 
   Future<List<Map<String, dynamic>>> _fetchOrders() async {
-    final result = await Supabase.instance.client
-        .from('orders')
-        .select()
-        .order('created_at', ascending: false);
-    return List<Map<String, dynamic>>.from(result);
+    return PaymentService().fetchMyOrders();
   }
 
   @override

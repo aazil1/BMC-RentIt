@@ -12,6 +12,8 @@ import 'screens/xendit_webview_screen.dart';
 import 'services/listing_service.dart';
 import 'services/payment_service.dart';
 
+typedef OrdersLoader = Future<List<Map<String, dynamic>>> Function();
+
 Widget _listingImage(
   RentalListing listing, {
   required double height,
@@ -148,9 +150,10 @@ Future<void> main() async {
 }
 
 class RentItApp extends StatelessWidget {
-  const RentItApp({super.key, this.listingService});
+  const RentItApp({super.key, this.listingService, this.ordersLoader});
 
   final ListingService? listingService;
+  final OrdersLoader? ordersLoader;
 
   @override
   Widget build(BuildContext context) {
@@ -187,15 +190,21 @@ class RentItApp extends StatelessWidget {
           ),
         ),
       ),
-      home: RentItHome(listingService: listingService),
+      home: RentItHome(
+        listingService: listingService,
+        ordersLoader:
+            ordersLoader ??
+            (listingService == null ? PaymentService().fetchMyOrders : null),
+      ),
     );
   }
 }
 
 class RentItHome extends StatefulWidget {
-  const RentItHome({super.key, this.listingService});
+  const RentItHome({super.key, this.listingService, this.ordersLoader});
 
   final ListingService? listingService;
+  final OrdersLoader? ordersLoader;
 
   @override
   State<RentItHome> createState() => _RentItHomeState();
@@ -205,6 +214,7 @@ class _RentItHomeState extends State<RentItHome> {
   late final ListingService _listingService =
       widget.listingService ?? ListingService();
   int _currentIndex = 0;
+  int _activityRefreshKey = 0;
   final List<Conversation> _conversations = [];
   final List<RentalListing> _listings = List.of(sampleListings);
   final Set<String> _savedListingIds = {};
@@ -388,6 +398,8 @@ class _RentItHomeState extends State<RentItHome> {
       ListItemScreen(ownerName: _profileName, onPublish: _publishListing),
       ActivityScreen(
         listings: _listings,
+        ordersLoader: widget.ordersLoader,
+        refreshKey: _activityRefreshKey,
         onMessageOwner: _startConversation,
         onReviewSaved: _saveListingReview,
       ),
@@ -440,8 +452,10 @@ class _RentItHomeState extends State<RentItHome> {
         ),
         child: NavigationBar(
           selectedIndex: _currentIndex,
-          onDestinationSelected: (value) =>
-              setState(() => _currentIndex = value),
+          onDestinationSelected: (value) => setState(() {
+            _currentIndex = value;
+            if (value == 3) _activityRefreshKey++;
+          }),
           destinations: const [
             NavigationDestination(
               icon: Icon(Icons.home_outlined),
@@ -2811,11 +2825,15 @@ class ActivityScreen extends StatefulWidget {
   const ActivityScreen({
     super.key,
     required this.listings,
+    this.ordersLoader,
+    this.refreshKey = 0,
     required this.onMessageOwner,
     required this.onReviewSaved,
   });
 
   final List<RentalListing> listings;
+  final OrdersLoader? ordersLoader;
+  final int refreshKey;
   final ValueChanged<RentalListing> onMessageOwner;
   final void Function(String listingId, Review review) onReviewSaved;
 
@@ -2827,6 +2845,9 @@ class _ActivityScreenState extends State<ActivityScreen> {
   static const _allStatuses = [
     'All',
     'Pending',
+    'Paid',
+    'Failed',
+    'Expired',
     'Confirmed',
     'Completed',
     'Refund requested',
@@ -2834,6 +2855,8 @@ class _ActivityScreenState extends State<ActivityScreen> {
 
   final TextEditingController _searchController = TextEditingController();
   String _selectedStatus = 'All';
+  bool _isLoadingOrders = false;
+  String? _ordersError;
   final List<_ActivityEntry> _activities = [
     _ActivityEntry(
       title: 'Sony Alpha a7 III Camera Kit',
@@ -2856,9 +2879,72 @@ class _ActivityScreenState extends State<ActivityScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _loadOrders();
+  }
+
+  @override
+  void didUpdateWidget(covariant ActivityScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.refreshKey != oldWidget.refreshKey) _loadOrders();
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadOrders() async {
+    final loadOrders = widget.ordersLoader;
+    if (loadOrders == null) return;
+
+    setState(() {
+      _isLoadingOrders = true;
+      _ordersError = null;
+    });
+    try {
+      final orders = await loadOrders();
+      if (!mounted) return;
+      final orderEntries = orders.map(_activityFromOrder).toList();
+      setState(() {
+        _activities.removeWhere((activity) => activity.isOrder);
+        _activities.insertAll(0, orderEntries);
+        _isLoadingOrders = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _ordersError = error.toString();
+        _isLoadingOrders = false;
+      });
+    }
+  }
+
+  _ActivityEntry _activityFromOrder(Map<String, dynamic> order) {
+    final externalId = order['external_id']?.toString() ?? 'Unknown';
+    final rawStatus = order['status']?.toString().toUpperCase() ?? 'PENDING';
+    final status = switch (rawStatus) {
+      'PAID' => 'Paid',
+      'FAILED' => 'Failed',
+      'EXPIRED' => 'Expired',
+      _ => 'Pending',
+    };
+    final amount = order['amount'];
+    final amountText = amount is num ? amount.toStringAsFixed(2) : '0.00';
+    final createdAt = DateTime.tryParse(order['created_at']?.toString() ?? '');
+    final createdText = createdAt == null
+        ? ''
+        : ' · ${createdAt.toLocal().toString().split('.').first}';
+
+    return _ActivityEntry(
+      title: order['product_name']?.toString() ?? 'Rental order',
+      status: status,
+      detail: 'Order $externalId · ₱$amountText$createdText',
+      listingId: order['listing_id']?.toString() ?? '',
+      isOrder: true,
+    );
   }
 
   List<_ActivityEntry> get _visibleActivities {
@@ -2918,19 +3004,21 @@ class _ActivityScreenState extends State<ActivityScreen> {
           ],
         ),
         actions: [
-          if (activity.status == 'Pending')
+          if (!activity.isOrder && activity.status == 'Pending')
             TextButton(
               onPressed: () =>
                   _updateActivityStatus(dialogContext, activity, 'Confirmed'),
               child: const Text('Confirm rental'),
             ),
-          if (activity.status == 'Confirmed')
+          if (!activity.isOrder && activity.status == 'Confirmed')
             TextButton(
               onPressed: () =>
                   _updateActivityStatus(dialogContext, activity, 'Completed'),
               child: const Text('Mark completed'),
             ),
-          if (activity.status == 'Confirmed' || activity.status == 'Completed')
+          if (!activity.isOrder &&
+              (activity.status == 'Confirmed' ||
+                  activity.status == 'Completed'))
             TextButton(
               onPressed: () => _updateActivityStatus(
                 dialogContext,
@@ -2939,7 +3027,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
               ),
               child: const Text('Request a refund'),
             ),
-          if (activity.status == 'Completed')
+          if (!activity.isOrder && activity.status == 'Completed')
             TextButton(
               onPressed: () {
                 Navigator.pop(dialogContext);
@@ -3082,31 +3170,67 @@ class _ActivityScreenState extends State<ActivityScreen> {
               ),
               const SizedBox(height: 10),
               Expanded(
-                child: _visibleActivities.isEmpty
-                    ? const Center(
-                        child: Text(
-                          'No matching activity.',
-                          style: TextStyle(color: Color(0xFFD8C9BC)),
+                child: Column(
+                  children: [
+                    if (_isLoadingOrders) const LinearProgressIndicator(),
+                    if (_ordersError != null)
+                      ListTile(
+                        dense: true,
+                        title: const Text('Could not load your orders.'),
+                        subtitle: Text(_ordersError!),
+                        trailing: IconButton(
+                          tooltip: 'Retry loading orders',
+                          onPressed: _loadOrders,
+                          icon: const Icon(Icons.refresh),
                         ),
-                      )
-                    : ListView.separated(
-                        itemCount: _visibleActivities.length,
-                        separatorBuilder: (context, index) =>
-                            const SizedBox(height: 12),
-                        itemBuilder: (_, index) {
-                          final activity = _visibleActivities[index];
-                          return _ActivityCard(
-                            title: activity.title,
-                            status: activity.status,
-                            detail: activity.detail,
-                            review: activity.review,
-                            onTap: () => _showActivityDetails(activity),
-                            onMessageOwner: () => _messageOwner(activity),
-                            onReview: () => _showReviewDialog(activity),
-                            onDelete: () => _deleteActivity(activity),
-                          );
-                        },
                       ),
+                    Expanded(
+                      child: RefreshIndicator(
+                        onRefresh: _loadOrders,
+                        child: _visibleActivities.isEmpty
+                            ? ListView(
+                                physics: const AlwaysScrollableScrollPhysics(),
+                                children: const [
+                                  SizedBox(
+                                    height: 240,
+                                    child: Center(
+                                      child: Text(
+                                        'No matching activity.',
+                                        style: TextStyle(
+                                          color: Color(0xFFD8C9BC),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : ListView.separated(
+                                physics: const AlwaysScrollableScrollPhysics(),
+                                itemCount: _visibleActivities.length,
+                                separatorBuilder: (context, index) =>
+                                    const SizedBox(height: 12),
+                                itemBuilder: (_, index) {
+                                  final activity = _visibleActivities[index];
+                                  return _ActivityCard(
+                                    title: activity.title,
+                                    status: activity.status,
+                                    detail: activity.detail,
+                                    review: activity.review,
+                                    showMessageOwner:
+                                        activity.listingId.isNotEmpty,
+                                    showDelete: !activity.isOrder,
+                                    onTap: () => _showActivityDetails(activity),
+                                    onMessageOwner: () =>
+                                        _messageOwner(activity),
+                                    onReview: () => _showReviewDialog(activity),
+                                    onDelete: () => _deleteActivity(activity),
+                                  );
+                                },
+                              ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -3122,12 +3246,14 @@ class _ActivityEntry {
     required this.status,
     required this.detail,
     required this.listingId,
+    this.isOrder = false,
   });
 
   final String title;
   String status;
   final String detail;
   final String listingId;
+  final bool isOrder;
   Review? review;
 }
 
@@ -3138,6 +3264,8 @@ class _ActivityCard extends StatelessWidget {
     required this.status,
     required this.detail,
     required this.review,
+    required this.showMessageOwner,
+    required this.showDelete,
     required this.onTap,
     required this.onMessageOwner,
     required this.onReview,
@@ -3148,6 +3276,8 @@ class _ActivityCard extends StatelessWidget {
   final String status;
   final String detail;
   final Review? review;
+  final bool showMessageOwner;
+  final bool showDelete;
   final VoidCallback onTap;
   final VoidCallback onMessageOwner;
   final VoidCallback onReview;
@@ -3156,7 +3286,8 @@ class _ActivityCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = switch (status) {
-      'Confirmed' => const Color(0xFF6E8B75),
+      'Confirmed' || 'Paid' => const Color(0xFF6E8B75),
+      'Failed' || 'Expired' => const Color(0xFFB3261E),
       'Completed' => const Color(0xFF8B5A38),
       'Refund requested' => const Color(0xFFB36B9A),
       _ => const Color(0xFFF4510B),
@@ -3222,16 +3353,17 @@ class _ActivityCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  IconButton(
-                    tooltip: 'Delete activity',
-                    onPressed: onDelete,
-                    visualDensity: VisualDensity.compact,
-                    icon: const Icon(
-                      Icons.delete_outline,
-                      color: Color(0xFFD8C9BC),
-                      size: 18,
+                  if (showDelete)
+                    IconButton(
+                      tooltip: 'Delete activity',
+                      onPressed: onDelete,
+                      visualDensity: VisualDensity.compact,
+                      icon: const Icon(
+                        Icons.delete_outline,
+                        color: Color(0xFFD8C9BC),
+                        size: 18,
+                      ),
                     ),
-                  ),
                 ],
               ),
               if (review != null)
@@ -3253,15 +3385,16 @@ class _ActivityCard extends StatelessWidget {
               Wrap(
                 spacing: 8,
                 children: [
-                  TextButton.icon(
-                    onPressed: onMessageOwner,
-                    icon: const Icon(Icons.chat_bubble_outline, size: 16),
-                    label: const Text('Message owner'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: const Color(0xFFFFB27F),
-                      visualDensity: VisualDensity.compact,
+                  if (showMessageOwner)
+                    TextButton.icon(
+                      onPressed: onMessageOwner,
+                      icon: const Icon(Icons.chat_bubble_outline, size: 16),
+                      label: const Text('Message owner'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: const Color(0xFFFFB27F),
+                        visualDensity: VisualDensity.compact,
+                      ),
                     ),
-                  ),
                   if (status == 'Completed')
                     TextButton.icon(
                       onPressed: onReview,

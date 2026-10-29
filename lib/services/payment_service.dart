@@ -51,10 +51,24 @@ class PaymentService {
     return _invokeInvoice({'listing_id': listingId, 'days': days});
   }
 
+  Future<List<Map<String, dynamic>>> fetchMyOrders() async {
+    await AppConfig.initializeSupabase();
+    final userId = await _ensureUser();
+    final result = await Supabase.instance.client
+        .from('orders')
+        .select(
+          'external_id, product_name, amount, status, listing_id, product_id, created_at',
+        )
+        .eq('owner_id', userId)
+        .order('created_at', ascending: false);
+    return List<Map<String, dynamic>>.from(result);
+  }
+
   Future<Map<String, dynamic>> _invokeInvoice(
     Map<String, dynamic> requestBody,
   ) async {
     await AppConfig.initializeSupabase();
+    await _ensureUser();
 
     late final FunctionResponse response;
     try {
@@ -98,6 +112,7 @@ class PaymentService {
 
   Future<String> checkOrderStatus(String externalId) async {
     await AppConfig.initializeSupabase();
+    await _ensureUser();
 
     final response = await Supabase.instance.client.functions.invoke(
       'get-order-status',
@@ -115,5 +130,18 @@ class PaymentService {
     }
 
     return data['status'] as String;
+  }
+
+  Future<String> _ensureUser() async {
+    final client = Supabase.instance.client;
+    final existingUser = client.auth.currentUser;
+    if (existingUser != null) return existingUser.id;
+
+    final response = await client.auth.signInAnonymously();
+    final userId = response.user?.id;
+    if (userId == null) {
+      throw const FormatException('Supabase did not create an owner identity.');
+    }
+    return userId;
   }
 }

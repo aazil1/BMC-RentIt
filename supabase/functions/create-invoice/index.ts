@@ -26,6 +26,11 @@ const errorMessage = (error: unknown) =>
     ? error.message
     : JSON.stringify(error) ?? String(error);
 
+const isUuid = (value: string) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+    value,
+  );
+
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (request.method !== "POST") return json({ error: "Method not allowed." }, 405);
@@ -42,12 +47,25 @@ Deno.serve(async (request) => {
     }
 
     const admin = createClient(supabaseUrl, serviceRoleKey);
+    const authorization = request.headers.get("authorization");
+    const accessToken = authorization?.replace(/^Bearer\s+/i, "");
+    if (!accessToken) {
+      return json({ error: "Sign in before creating an order." }, 401);
+    }
+
+    const { data: userData, error: userError } = await admin.auth.getUser(
+      accessToken,
+    );
+    if (userError || !userData.user) {
+      return json({ error: "The signed-in user could not be verified." }, 401);
+    }
+
     let amount: number;
     let description: string;
 
     if (typeof body.listing_id === "string") {
       let listing = listings[body.listing_id as keyof typeof listings];
-      if (!listing) {
+      if (!listing && isUuid(body.listing_id)) {
         const { data: persistedListing, error } = await admin
           .from("rental_listings")
           .select("name, price_per_day, deposit, available")
@@ -103,8 +121,12 @@ Deno.serve(async (request) => {
       product_name: description,
       amount,
       status: "PENDING",
+      owner_id: userData.user.id,
       ...(typeof body.listing_id === "string"
         ? { listing_id: body.listing_id }
+        : {}),
+      ...(Number.isSafeInteger(body.product_id)
+        ? { product_id: body.product_id }
         : {}),
     });
     if (orderError) throw orderError;

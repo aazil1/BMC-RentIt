@@ -198,6 +198,63 @@ void main() {
     expect(find.text('Requested for 3 days · ₱1,800 total'), findsNWidgets(2));
   });
 
+  testWidgets('Activity displays persisted payment orders', (tester) async {
+    await tester.pumpWidget(
+      RentItApp(
+        listingService: _FakeListingService(),
+        ordersLoader: () async => [
+          {
+            'external_id': 'rentit-test-order',
+            'product_name': 'Test rental item',
+            'amount': 1500,
+            'status': 'PAID',
+            'listing_id': 'published-test-id',
+            'created_at': '2026-10-29T12:00:00Z',
+          },
+        ],
+      ),
+    );
+    await tester.tap(find.text('Activity').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Test rental item'), findsOneWidget);
+    expect(find.text('Paid'), findsNWidgets(2));
+    expect(find.textContaining('rentit-test-order'), findsOneWidget);
+  });
+
+  testWidgets('Activity reloads orders when returning to its tab', (
+    tester,
+  ) async {
+    var orderCount = 0;
+    await tester.pumpWidget(
+      RentItApp(
+        listingService: _FakeListingService(),
+        ordersLoader: () async => List.generate(
+          orderCount,
+          (index) => {
+            'external_id': 'rentit-order-$index',
+            'product_name': 'Persisted order $index',
+            'amount': 1500,
+            'status': 'PENDING',
+            'listing_id': 'published-test-id',
+            'created_at': '2026-10-29T12:00:00Z',
+          },
+        ),
+      ),
+    );
+    await tester.tap(find.text('Activity').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Persisted order 0'), findsNothing);
+
+    orderCount = 1;
+    await tester.tap(find.text('Explore').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Activity').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Persisted order 0'), findsOneWidget);
+  });
+
   testWidgets('Activity can be searched and filtered by status', (
     tester,
   ) async {

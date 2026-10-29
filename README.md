@@ -25,6 +25,7 @@ Run the SQL files in the Supabase Dashboard's **SQL Editor**, in this order:
 3. [`supabase/migrations/202610280001_create_listing_images_bucket.sql`](./supabase/migrations/202610280001_create_listing_images_bucket.sql) creates the public `listing-images` Storage bucket and its read/upload policies.
 4. [`supabase/migrations/202610290001_create_listing_images.sql`](./supabase/migrations/202610290001_create_listing_images.sql) creates the listing-image metadata table and policies.
 5. [`supabase/migrations/202610290002_secure_listing_ownership_and_deletion.sql`](./supabase/migrations/202610290002_secure_listing_ownership_and_deletion.sql) adds listing ownership and owner-only create, upload, and delete policies.
+6. [`supabase/migrations/202610290003_order_activity_ownership.sql`](./supabase/migrations/202610290003_order_activity_ownership.sql) associates orders with their owner and lets signed-in users read their own orders.
 
 The app uses Supabase anonymous sign-in to give each installation an owner ID.
 Enable **Anonymous Sign-Ins** under **Authentication → Sign In / Providers**
@@ -32,7 +33,9 @@ before publishing listings. Listing reads remain public; creating and deleting
 listings, and uploading or deleting their images, require the matching owner.
 Deleting a listing through the app removes its image files from Storage and its
 database rows. Listings created before owner IDs were added cannot be deleted
-through the owner-only app flow.
+through the owner-only app flow. Orders created during checkout are saved with
+the signed-in owner's ID and appear in Activity and Order History; older orders
+without an owner ID cannot be assigned automatically.
 
 Install the Supabase CLI, sign in, and link this project to deploy Edge
 Functions and configure their secrets:
