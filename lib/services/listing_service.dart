@@ -9,26 +9,31 @@ import '../models/rental_listing.dart';
 class ListingService {
   static const _imageBucket = 'listing-images';
 
+  String? get currentUserId => Supabase.instance.client.auth.currentUser?.id;
+
   Future<RentalListing> createListing(RentalListing listing) async {
     await AppConfig.initializeSupabase();
+    final ownerId = await _ensureUser();
     var imageUrl = listing.imageUrl;
+    String? storagePath;
     if (listing.imageBytes != null) {
       final (extension, contentType) = _imageFormat(listing.imageBytes!);
-      final imagePath = 'listings/${listing.id}.$extension';
+      storagePath = 'users/$ownerId/listings/${listing.id}.$extension';
       final client = Supabase.instance.client;
       await client.storage
           .from(_imageBucket)
           .uploadBinary(
-            imagePath,
+            storagePath,
             listing.imageBytes!,
             fileOptions: FileOptions(contentType: contentType),
           );
-      imageUrl = client.storage.from(_imageBucket).getPublicUrl(imagePath);
+      imageUrl = client.storage.from(_imageBucket).getPublicUrl(storagePath);
     }
 
     final row = await Supabase.instance.client
         .from('rental_listings')
         .insert({
+          'owner_id': ownerId,
           'name': listing.name,
           'category': listing.category,
           'owner_name': listing.ownerName,
@@ -47,7 +52,41 @@ class ListingService {
     if (id is! String || id.isEmpty) {
       throw const FormatException('Supabase did not return a listing ID.');
     }
-    return listing.copyWith(id: id, imageUrl: imageUrl);
+    if (storagePath != null) {
+      await Supabase.instance.client.from('listing_images').insert({
+        'listing_id': id,
+        'image_url': imageUrl,
+        'storage_path': storagePath,
+        'position': 0,
+      });
+    }
+    return listing.copyWith(id: id, ownerId: ownerId, imageUrl: imageUrl);
+  }
+
+  Future<void> deleteListing(String listingId) async {
+    await AppConfig.initializeSupabase();
+    await _ensureUser();
+    final client = Supabase.instance.client;
+    final imageRows = await client
+        .from('listing_images')
+        .select('storage_path')
+        .eq('listing_id', listingId);
+    final storagePaths = imageRows
+        .map((row) => row['storage_path'] as String)
+        .toList();
+
+    if (storagePaths.isNotEmpty) {
+      await client.storage.from(_imageBucket).remove(storagePaths);
+    }
+
+    final deletedRows = await client
+        .from('rental_listings')
+        .delete()
+        .eq('id', listingId)
+        .select('id');
+    if (deletedRows.isEmpty) {
+      throw StateError('You do not have permission to delete this listing.');
+    }
   }
 
   Future<List<RentalListing>> fetchListings() async {
@@ -55,7 +94,7 @@ class ListingService {
     final rows = await Supabase.instance.client
         .from('rental_listings')
         .select(
-          'id, name, category, owner_name, location, description, condition, '
+          'id, owner_id, name, category, owner_name, location, description, condition, '
           'price_per_day, deposit, available, rules, image_url',
         )
         .eq('available', true)
@@ -65,6 +104,19 @@ class ListingService {
 
   int _depositAmount(String value) =>
       int.tryParse(value.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+
+  Future<String> _ensureUser() async {
+    final client = Supabase.instance.client;
+    final existingUser = client.auth.currentUser;
+    if (existingUser != null) return existingUser.id;
+
+    final response = await client.auth.signInAnonymously();
+    final userId = response.user?.id;
+    if (userId == null) {
+      throw const FormatException('Supabase did not create an owner identity.');
+    }
+    return userId;
+  }
 
   (String, String) _imageFormat(Uint8List bytes) {
     if (bytes.length >= 3 &&
@@ -102,6 +154,7 @@ class ListingService {
     final rules = row['rules'];
     return RentalListing(
       id: row['id'] as String,
+      ownerId: row['owner_id'] as String?,
       name: row['name'] as String,
       category: row['category'] as String,
       ownerName: row['owner_name'] as String,

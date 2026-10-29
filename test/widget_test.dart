@@ -139,16 +139,21 @@ void main() {
     await tester.enterText(find.byType(TextField).at(0), 'Test rental item');
     await tester.enterText(find.byType(TextField).at(2), '450');
     await tester.enterText(
-      find.byType(TextField).at(4),
+      find.byKey(const Key('listing-security-deposit')),
+      '1200',
+    );
+    await tester.enterText(
+      find.byType(TextField).at(5),
       'Return clean\nKeep it dry',
     );
-    await tester.enterText(find.byType(TextField).at(5), 'Quezon City');
+    await tester.enterText(find.byType(TextField).at(6), 'Quezon City');
     await tester.ensureVisible(find.text('Publish listing'));
     await tester.tap(find.text('Publish listing'));
     await tester.pumpAndSettle();
 
     expect(listingService.createdListings, hasLength(1));
     expect(listingService.createdListings.single.name, 'Test rental item');
+    expect(listingService.createdListings.single.deposit, '₱1200');
     expect(listingService.createdListings.single.rules, [
       'Return clean',
       'Keep it dry',
@@ -178,6 +183,7 @@ void main() {
     expect(find.text('Delete listing?'), findsOneWidget);
     await tester.tap(find.text('Delete listing').last);
     await tester.pumpAndSettle();
+    expect(listingService.deletedListingIds, ['published-test-id']);
     expect(find.text('Edited rental item'), findsNothing);
   });
 
@@ -324,6 +330,10 @@ void main() {
 
 class _FakeListingService extends ListingService {
   final List<RentalListing> createdListings = [];
+  final List<String> deletedListingIds = [];
+
+  @override
+  String? get currentUserId => 'test-owner-id';
 
   @override
   Future<List<RentalListing>> fetchListings() async => [];
@@ -331,6 +341,11 @@ class _FakeListingService extends ListingService {
   @override
   Future<RentalListing> createListing(RentalListing listing) async {
     createdListings.add(listing);
-    return listing.copyWith(id: 'published-test-id');
+    return listing.copyWith(id: 'published-test-id', ownerId: currentUserId);
+  }
+
+  @override
+  Future<void> deleteListing(String listingId) async {
+    deletedListingIds.add(listingId);
   }
 }

@@ -281,7 +281,9 @@ class _RentItHomeState extends State<RentItHome> {
     );
   }
 
-  void _deleteListing(RentalListing listing) {
+  Future<void> _deleteListing(RentalListing listing) async {
+    await _listingService.deleteListing(listing.id);
+    if (!mounted) return;
     setState(() {
       _listings.removeWhere((item) => item.id == listing.id);
       _savedListingIds.remove(listing.id);
@@ -289,7 +291,8 @@ class _RentItHomeState extends State<RentItHome> {
   }
 
   bool _canManageListing(RentalListing listing) =>
-      listing.ownerName == _profileName &&
+      listing.ownerId != null &&
+      listing.ownerId == _listingService.currentUserId &&
       !sampleListings.any((sample) => sample.id == listing.id);
 
   void _toggleSaved(RentalListing listing) {
@@ -488,7 +491,7 @@ class ExploreScreen extends StatefulWidget {
   final Set<String> savedListingIds;
   final bool Function(RentalListing) canManageListing;
   final ValueChanged<RentalListing> onUpdateListing;
-  final ValueChanged<RentalListing> onDeleteListing;
+  final Future<void> Function(RentalListing) onDeleteListing;
   final ValueChanged<RentalListing> onToggleSaved;
   final ValueChanged<RentalListing> onMessageOwner;
 
@@ -740,7 +743,7 @@ class _ListingCard extends StatefulWidget {
   final bool isSaved;
   final bool canManage;
   final ValueChanged<RentalListing> onUpdateListing;
-  final ValueChanged<RentalListing> onDeleteListing;
+  final Future<void> Function(RentalListing) onDeleteListing;
   final ValueChanged<RentalListing> onToggleSaved;
   final ValueChanged<RentalListing> onMessageOwner;
 
@@ -904,7 +907,7 @@ class ListingDetailScreen extends StatefulWidget {
   final bool isSaved;
   final bool canManage;
   final ValueChanged<RentalListing>? onUpdateListing;
-  final ValueChanged<RentalListing>? onDeleteListing;
+  final Future<void> Function(RentalListing)? onDeleteListing;
   final ValueChanged<RentalListing> onToggleSaved;
   final ValueChanged<RentalListing> onMessageOwner;
 
@@ -951,8 +954,15 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
       ),
     );
     if (confirmed != true || !mounted) return;
-    widget.onDeleteListing?.call(listing);
-    Navigator.of(context).pop();
+    try {
+      await widget.onDeleteListing?.call(listing);
+      if (mounted) Navigator.of(context).pop();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not delete listing: $error')),
+      );
+    }
   }
 
   @override
@@ -1388,6 +1398,7 @@ class _EditListingDialogState extends State<_EditListingDialog> {
     Navigator.of(context).pop(
       RentalListing(
         id: widget.listing.id,
+        ownerId: widget.listing.ownerId,
         name: _nameController.text.trim(),
         category: _category,
         ownerName: widget.listing.ownerName,
@@ -1834,7 +1845,7 @@ class InboxScreen extends StatefulWidget {
   final Set<String> savedListingIds;
   final bool Function(RentalListing) canManageListing;
   final ValueChanged<RentalListing> onUpdateListing;
-  final ValueChanged<RentalListing> onDeleteListing;
+  final Future<void> Function(RentalListing) onDeleteListing;
   final ValueChanged<RentalListing> onToggleSaved;
   final ValueChanged<Conversation> onConversationUpdated;
   final ValueChanged<RentalListing> onMessageOwner;
@@ -2224,7 +2235,7 @@ class ChatScreen extends StatefulWidget {
   final bool isSaved;
   final bool Function(RentalListing) canManageListing;
   final ValueChanged<RentalListing> onUpdateListing;
-  final ValueChanged<RentalListing> onDeleteListing;
+  final Future<void> Function(RentalListing) onDeleteListing;
   final ValueChanged<RentalListing>? onToggleSaved;
   final ValueChanged<Conversation> onConversationUpdated;
   final ValueChanged<RentalListing> onMessageOwner;
@@ -2463,6 +2474,7 @@ class _ListItemScreenState extends State<ListItemScreen> {
   final titleController = TextEditingController();
   final locationController = TextEditingController(text: 'Makati');
   final priceController = TextEditingController(text: '600');
+  final depositController = TextEditingController(text: '0');
   final descriptionController = TextEditingController();
   final conditionController = TextEditingController(text: 'Good');
   final rulesController = TextEditingController(
@@ -2478,6 +2490,7 @@ class _ListItemScreenState extends State<ListItemScreen> {
     titleController.dispose();
     locationController.dispose();
     priceController.dispose();
+    depositController.dispose();
     descriptionController.dispose();
     conditionController.dispose();
     rulesController.dispose();
@@ -2500,11 +2513,17 @@ class _ListItemScreenState extends State<ListItemScreen> {
     final name = titleController.text.trim();
     final location = locationController.text.trim();
     final price = int.tryParse(priceController.text.trim());
-    if (name.isEmpty || location.isEmpty || price == null || price <= 0) {
+    final deposit = int.tryParse(depositController.text.trim());
+    if (name.isEmpty ||
+        location.isEmpty ||
+        price == null ||
+        price <= 0 ||
+        deposit == null ||
+        deposit < 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Enter an item title, pickup location, and valid daily rate.',
+            'Enter an item title, pickup location, valid daily rate, and non-negative security deposit.',
           ),
         ),
       );
@@ -2530,7 +2549,7 @@ class _ListItemScreenState extends State<ListItemScreen> {
           : conditionController.text.trim(),
       imageUrl: '',
       imageBytes: imageBytes,
-      deposit: '₱0',
+      deposit: '₱$deposit',
       pricePerDay: price,
       rating: 0,
       isAvailable: true,
@@ -2709,6 +2728,14 @@ class _ListItemScreenState extends State<ListItemScreen> {
                 keyboardType: TextInputType.number,
                 style: const TextStyle(color: Colors.white, fontSize: 9),
                 decoration: _designInputDecoration('Daily rate (₱) *'),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                key: const Key('listing-security-deposit'),
+                controller: depositController,
+                keyboardType: TextInputType.number,
+                style: const TextStyle(color: Colors.white, fontSize: 9),
+                decoration: _designInputDecoration('Security deposit (₱)'),
               ),
               const SizedBox(height: 8),
               TextField(
@@ -3257,6 +3284,7 @@ class _ActivityCard extends StatelessWidget {
   }
 }
 
+//review list
 class _CreateReviewDialog extends StatefulWidget {
   const _CreateReviewDialog({required this.rentalName, this.initialReview});
 
@@ -3300,6 +3328,7 @@ class _CreateReviewDialogState extends State<_CreateReviewDialog> {
     );
   }
 
+  //reviews
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
@@ -3403,7 +3432,7 @@ class ProfileScreen extends StatelessWidget {
   final String location;
   final bool Function(RentalListing) canManageListing;
   final ValueChanged<RentalListing> onUpdateListing;
-  final ValueChanged<RentalListing> onDeleteListing;
+  final Future<void> Function(RentalListing) onDeleteListing;
   final List<RentalListing> savedListings;
   final List<RentalListing> myListings;
   final void Function({
@@ -3641,6 +3670,7 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
+  //profile
   Widget _profileAction({
     required String title,
     required String trailing,
@@ -3696,6 +3726,7 @@ class ProfileScreen extends StatelessWidget {
   }
 }
 
+//edit profile
 class _EditProfileDialog extends StatefulWidget {
   const _EditProfileDialog({
     required this.name,

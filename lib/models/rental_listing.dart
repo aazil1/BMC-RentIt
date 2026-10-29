@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 class RentalListing {
   final String id;
+  final String? ownerId;
   final String name;
   final String category;
   final String ownerName;
@@ -21,6 +22,7 @@ class RentalListing {
 
   const RentalListing({
     required this.id,
+    this.ownerId,
     required this.name,
     required this.category,
     required this.ownerName,
@@ -40,12 +42,14 @@ class RentalListing {
 
   RentalListing copyWith({
     String? id,
+    String? ownerId,
     String? imageUrl,
     double? rating,
     List<Review>? reviews,
   }) {
     return RentalListing(
       id: id ?? this.id,
+      ownerId: ownerId ?? this.ownerId,
       name: name,
       category: category,
       ownerName: ownerName,

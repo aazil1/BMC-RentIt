@@ -16,37 +16,32 @@ secret key on Supabase, never in Flutter or a `--dart-define`.
    `https://damfkakuqaqybudsdcfo.supabase.co/functions/v1/xendit-webhook`
 4. Copy the callback verification token from the Xendit Dashboard.
 
-### 2. Deploy the Supabase backend
+### 2. Configure the Supabase backend
 
-Install the Supabase CLI, sign in, and link this project:
+Run the SQL files in the Supabase Dashboard's **SQL Editor**, in this order:
+
+1. [`supabase/migrations/v1.sql`](./supabase/migrations/v1.sql) creates products and orders.
+2. [`supabase/migrations/v2.sql`](./supabase/migrations/v2.sql) creates rental listings.
+3. [`supabase/migrations/202610280001_create_listing_images_bucket.sql`](./supabase/migrations/202610280001_create_listing_images_bucket.sql) creates the public `listing-images` Storage bucket and its read/upload policies.
+4. [`supabase/migrations/202610290001_create_listing_images.sql`](./supabase/migrations/202610290001_create_listing_images.sql) creates the listing-image metadata table and policies.
+5. [`supabase/migrations/202610290002_secure_listing_ownership_and_deletion.sql`](./supabase/migrations/202610290002_secure_listing_ownership_and_deletion.sql) adds listing ownership and owner-only create, upload, and delete policies.
+
+The app uses Supabase anonymous sign-in to give each installation an owner ID.
+Enable **Anonymous Sign-Ins** under **Authentication → Sign In / Providers**
+before publishing listings. Listing reads remain public; creating and deleting
+listings, and uploading or deleting their images, require the matching owner.
+Deleting a listing through the app removes its image files from Storage and its
+database rows. Listings created before owner IDs were added cannot be deleted
+through the owner-only app flow.
+
+Install the Supabase CLI, sign in, and link this project to deploy Edge
+Functions and configure their secrets:
 
 ```powershell
 supabase login
 supabase link --project-ref damfkakuqaqybudsdcfo
-```
-
-Apply the orders and rental-listings migrations and store the Xendit
-credentials as Edge Function secrets:
-
-```powershell
-supabase db push
 supabase secrets set XENDIT_SECRET_KEY="your-test-secret-key" XENDIT_CALLBACK_TOKEN="your-callback-token"
 ```
-
-If you use the Supabase Dashboard instead of the CLI, open **SQL Editor** in
-your Supabase project and run the SQL in
-[`supabase/migrations/202610260001_create_orders.sql`](./supabase/migrations/202610260001_create_orders.sql).
-This is Supabase/PostgreSQL SQL, not MySQL. It creates the sample product rows
-and the order columns required by the invoice and callback functions. Also run
-[`supabase/migrations/202610260002_create_rental_listings.sql`](./supabase/migrations/202610260002_create_rental_listings.sql)
-to create the listing table used by published listings. Products and rental
-listings are readable by the app; order records remain private and are queried
-through the Edge Function. Listing creation is public because this app does not
-currently require users to sign in.
-Run
-[`supabase/migrations/202610280001_create_listing_images_bucket.sql`](./supabase/migrations/202610280001_create_listing_images_bucket.sql)
-as well to let the app upload listing photos that can be displayed to other
-users.
 
 Deploy the invoice and status functions. The webhook is called by Xendit, so
 deploy it without Supabase JWT verification; it verifies Xendit's callback token
