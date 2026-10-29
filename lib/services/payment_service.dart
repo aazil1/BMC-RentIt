@@ -57,11 +57,58 @@ class PaymentService {
     final result = await Supabase.instance.client
         .from('orders')
         .select(
-          'external_id, product_name, amount, status, listing_id, product_id, created_at',
+          'external_id, product_name, amount, status, rental_status, activity_hidden, review_rating, review_comment, listing_id, product_id, created_at',
         )
         .eq('owner_id', userId)
+        .eq('activity_hidden', false)
         .order('created_at', ascending: false);
     return List<Map<String, dynamic>>.from(result);
+  }
+
+  Future<void> updateRentalOrderStatus({
+    required String externalId,
+    required String status,
+  }) async {
+    final userId = await _currentUserId();
+    final updated = await Supabase.instance.client
+        .from('orders')
+        .update({'rental_status': status})
+        .eq('external_id', externalId)
+        .eq('owner_id', userId)
+        .select('external_id');
+    if (updated.isEmpty) {
+      throw StateError('Order not found or you do not have permission.');
+    }
+  }
+
+  Future<void> saveOrderReview({
+    required String externalId,
+    required int rating,
+    required String comment,
+  }) async {
+    final userId = await _currentUserId();
+    final updated = await Supabase.instance.client
+        .from('orders')
+        .update({'review_rating': rating, 'review_comment': comment})
+        .eq('external_id', externalId)
+        .eq('owner_id', userId)
+        .select('external_id');
+    if (updated.isEmpty) {
+      throw StateError('Order not found or you do not have permission.');
+    }
+  }
+
+  Future<void> hideOrderFromActivity(String externalId) async {
+    final userId = await _currentUserId();
+    final updated = await Supabase.instance.client
+        .from('orders')
+        .update({'activity_hidden': true})
+        .eq('external_id', externalId)
+        .eq('owner_id', userId)
+        .select('external_id');
+    if (updated.isEmpty) {
+      throw StateError('Order not found or you do not have permission.');
+    }
   }
 
   Future<Map<String, dynamic>> _invokeInvoice(
@@ -143,5 +190,10 @@ class PaymentService {
       throw const FormatException('Supabase did not create an owner identity.');
     }
     return userId;
+  }
+
+  Future<String> _currentUserId() async {
+    await AppConfig.initializeSupabase();
+    return _ensureUser();
   }
 }

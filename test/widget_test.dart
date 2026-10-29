@@ -218,8 +218,33 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Test rental item'), findsOneWidget);
-    expect(find.text('Paid'), findsNWidgets(2));
+    expect(find.text('Paid'), findsWidgets);
     expect(find.textContaining('rentit-test-order'), findsOneWidget);
+  });
+
+  testWidgets('Pending persisted order can be confirmed', (tester) async {
+    await _openPersistedOrder(tester, 'Pending');
+
+    expect(find.text('Confirm rental'), findsOneWidget);
+    expect(find.byTooltip('Delete activity'), findsWidgets);
+  });
+
+  testWidgets('Confirmed persisted order can be completed or refunded', (
+    tester,
+  ) async {
+    await _openPersistedOrder(tester, 'Confirmed');
+
+    expect(find.text('Mark completed'), findsOneWidget);
+    expect(find.text('Request a refund'), findsOneWidget);
+  });
+
+  testWidgets('Completed persisted order can be refunded and reviewed', (
+    tester,
+  ) async {
+    await _openPersistedOrder(tester, 'Completed');
+
+    expect(find.text('Request a refund'), findsOneWidget);
+    expect(find.text('Write a review'), findsWidgets);
   });
 
   testWidgets('Activity reloads orders when returning to its tab', (
@@ -383,6 +408,30 @@ void main() {
 
     expect(find.text('Alex Smith'), findsOneWidget);
   });
+}
+
+Future<void> _openPersistedOrder(WidgetTester tester, String status) async {
+  await tester.pumpWidget(
+    RentItApp(
+      listingService: _FakeListingService(),
+      ordersLoader: () async => [
+        {
+          'external_id': 'rentit-${status.toLowerCase()}',
+          'product_name': 'Persisted $status rental',
+          'amount': 1500,
+          'status': 'PAID',
+          'rental_status': status,
+          'listing_id': 'published-test-id',
+          'created_at': '2026-10-29T12:00:00Z',
+        },
+      ],
+    ),
+  );
+  await tester.tap(find.text('Activity').last);
+  await tester.pumpAndSettle();
+  await tester.ensureVisible(find.text('Persisted $status rental'));
+  await tester.tap(find.text('Persisted $status rental'));
+  await tester.pumpAndSettle();
 }
 
 class _FakeListingService extends ListingService {

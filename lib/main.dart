@@ -2924,13 +2924,14 @@ class _ActivityScreenState extends State<ActivityScreen> {
 
   _ActivityEntry _activityFromOrder(Map<String, dynamic> order) {
     final externalId = order['external_id']?.toString() ?? 'Unknown';
-    final rawStatus = order['status']?.toString().toUpperCase() ?? 'PENDING';
-    final status = switch (rawStatus) {
+    final paymentStatus = switch (order['status']?.toString().toUpperCase() ??
+        'PENDING') {
       'PAID' => 'Paid',
       'FAILED' => 'Failed',
       'EXPIRED' => 'Expired',
-      _ => 'Pending',
+      _ => 'Pending payment',
     };
+    final rentalStatus = order['rental_status']?.toString() ?? 'Pending';
     final amount = order['amount'];
     final amountText = amount is num ? amount.toStringAsFixed(2) : '0.00';
     final createdAt = DateTime.tryParse(order['created_at']?.toString() ?? '');
@@ -2940,10 +2941,20 @@ class _ActivityScreenState extends State<ActivityScreen> {
 
     return _ActivityEntry(
       title: order['product_name']?.toString() ?? 'Rental order',
-      status: status,
-      detail: 'Order $externalId · ₱$amountText$createdText',
+      status: rentalStatus,
+      detail:
+          'Payment: $paymentStatus · Order $externalId · ₱$amountText$createdText',
       listingId: order['listing_id']?.toString() ?? '',
       isOrder: true,
+      externalId: externalId,
+      paymentStatus: paymentStatus,
+      review: order['review_rating'] is num && order['review_comment'] is String
+          ? Review(
+              reviewerName: 'You',
+              rating: (order['review_rating'] as num).toDouble(),
+              comment: order['review_comment'] as String,
+            )
+          : null,
     );
   }
 
@@ -2951,7 +2962,9 @@ class _ActivityScreenState extends State<ActivityScreen> {
     final query = _searchController.text.trim().toLowerCase();
     return _activities.where((activity) {
       final matchesStatus =
-          _selectedStatus == 'All' || activity.status == _selectedStatus;
+          _selectedStatus == 'All' ||
+          activity.status == _selectedStatus ||
+          activity.paymentStatus == _selectedStatus;
       final matchesSearch =
           query.isEmpty ||
           activity.title.toLowerCase().contains(query) ||
@@ -2980,6 +2993,18 @@ class _ActivityScreenState extends State<ActivityScreen> {
       ),
     );
     if (confirmed != true || !mounted) return;
+    if (activity.isOrder) {
+      try {
+        await PaymentService().hideOrderFromActivity(activity.externalId!);
+      } catch (error) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not delete activity: $error')),
+        );
+        return;
+      }
+    }
+    if (!mounted) return;
     setState(() => _activities.remove(activity));
   }
 
@@ -2988,37 +3013,37 @@ class _ActivityScreenState extends State<ActivityScreen> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text(activity.title),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Status: ${activity.status}'),
-            const SizedBox(height: 8),
-            Text(activity.detail),
-            if (activity.review case final review?) ...[
-              const SizedBox(height: 12),
-              Text('Your review: ${review.rating.toStringAsFixed(0)}/5'),
-              const SizedBox(height: 4),
-              Text(review.comment),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Status: ${activity.status}'),
+              const SizedBox(height: 8),
+              Text(activity.detail),
+              if (activity.review case final review?) ...[
+                const SizedBox(height: 12),
+                Text('Your review: ${review.rating.toStringAsFixed(0)}/5'),
+                const SizedBox(height: 4),
+                Text(review.comment),
+              ],
             ],
-          ],
+          ),
         ),
         actions: [
-          if (!activity.isOrder && activity.status == 'Pending')
+          if (activity.status == 'Pending')
             TextButton(
               onPressed: () =>
                   _updateActivityStatus(dialogContext, activity, 'Confirmed'),
               child: const Text('Confirm rental'),
             ),
-          if (!activity.isOrder && activity.status == 'Confirmed')
+          if (activity.status == 'Confirmed')
             TextButton(
               onPressed: () =>
                   _updateActivityStatus(dialogContext, activity, 'Completed'),
               child: const Text('Mark completed'),
             ),
-          if (!activity.isOrder &&
-              (activity.status == 'Confirmed' ||
-                  activity.status == 'Completed'))
+          if (activity.status == 'Confirmed' || activity.status == 'Completed')
             TextButton(
               onPressed: () => _updateActivityStatus(
                 dialogContext,
@@ -3027,7 +3052,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
               ),
               child: const Text('Request a refund'),
             ),
-          if (!activity.isOrder && activity.status == 'Completed')
+          if (activity.status == 'Completed')
             TextButton(
               onPressed: () {
                 Navigator.pop(dialogContext);
@@ -3055,18 +3080,51 @@ class _ActivityScreenState extends State<ActivityScreen> {
       ),
     );
     if (review == null || !mounted) return;
+    if (activity.isOrder) {
+      try {
+        await PaymentService().saveOrderReview(
+          externalId: activity.externalId!,
+          rating: review.rating.round(),
+          comment: review.comment,
+        );
+      } catch (error) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not save review: $error')),
+        );
+        return;
+      }
+    }
+    if (!mounted) return;
     setState(() => activity.review = review);
-    widget.onReviewSaved(activity.listingId, review);
+    if (!activity.isOrder) {
+      widget.onReviewSaved(activity.listingId, review);
+    }
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Your review has been saved.')),
     );
   }
 
-  void _updateActivityStatus(
+  Future<void> _updateActivityStatus(
     BuildContext dialogContext,
     _ActivityEntry activity,
     String status,
-  ) {
+  ) async {
+    if (activity.isOrder) {
+      try {
+        await PaymentService().updateRentalOrderStatus(
+          externalId: activity.externalId!,
+          status: status,
+        );
+      } catch (error) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not update rental status: $error')),
+        );
+        return;
+      }
+    }
+    if (!mounted || !dialogContext.mounted) return;
     setState(() => activity.status = status);
     Navigator.pop(dialogContext);
     ScaffoldMessenger.of(context).showSnackBar(
@@ -3218,7 +3276,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
                                     review: activity.review,
                                     showMessageOwner:
                                         activity.listingId.isNotEmpty,
-                                    showDelete: !activity.isOrder,
+                                    showDelete: true,
                                     onTap: () => _showActivityDetails(activity),
                                     onMessageOwner: () =>
                                         _messageOwner(activity),
@@ -3247,6 +3305,9 @@ class _ActivityEntry {
     required this.detail,
     required this.listingId,
     this.isOrder = false,
+    this.externalId,
+    this.paymentStatus,
+    this.review,
   });
 
   final String title;
@@ -3254,6 +3315,8 @@ class _ActivityEntry {
   final String detail;
   final String listingId;
   final bool isOrder;
+  final String? externalId;
+  final String? paymentStatus;
   Review? review;
 }
 
